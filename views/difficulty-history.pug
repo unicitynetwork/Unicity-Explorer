@@ -1,0 +1,526 @@
+extends layout
+
+block headContent
+	title Difficulty History
+
+block content
+	+pageTitle("Difficulty History")
+	
+
+	+dismissableInfoAlert("diffHistPageNoteDismissed", "About the Difficulty Adjustment...")
+		h6.mb-2 About the Difficulty Adjustment
+
+		ul.mb-0.ms-n3
+			li Mining difficulty adjusts automatically every block.
+			li The adjustment aims to maintain an average block-mining time of #{coinConfig.targetBlockTimeMinutes} minutes.
+			li Difficulty changes every block based on an expoential moving average 
+			li On block 70228 the hash function was switched from SHA256 to RANDOMX ~ 100,000 times harder
+			li The numeric difficulty is a multiple of the difficulty of finding the easiest block (Block #0).
+
+			
+
+	div#progress-wrapper.mb-huge
+		div.card.shadow-sm.mb-3
+			div.card-body
+				span Loading data: 
+					span(id="progress-text")
+				div.progress.mt-2(id="progress-bar", style="height: 7px;")
+					div.progress-bar(id="data-progress", role="progressbar", aria-valuenow="0", aria-valuemin="0" ,aria-valuemax="100")
+
+
+	div#main-content(style="display: none;")
+		//- var yearItems = [["All Time", 10000], ["8 yr", 8], ["4 yr", 4], ["2 yr", 2], ["1 yr", 1]];
+		- var yearItems = [["All Time", 10000] ];
+
+		+pageTabs(["Details", "Data"])
+
+		.tab-content
+			+pageTab("Details", true)
+
+				.text-center
+					//.btn-group.mb-3
+					//	each yearItem in yearItems
+					//		a.btn.btn-outline-primary(id=`diff-hist-selector-${yearItem[1]}`, class="diff-hist-selector", href=`javascript:void(0)`, onclick=`$('.graph-diff-hist').hide(); $('#graph-diff-hist-${yearItem[1]}').show(); $('.graph-diff-change').hide(); $('#graph-diff-change-${yearItem[1]}').show(); $(".diff-hist-selector").addClass("btn-outline-primary").removeClass("btn-primary"); $(this).toggleClass("btn-outline-primary").addClass("btn-primary"); return false;`) #{yearItem[0]}
+	
+						// New "Redraw Graph" button
+					a.btn.btn-primary.graph-toggle-btn(
+						href="javascript:void(0)",
+						onclick="toggleDataDisplay()"
+					) Adjust For RandomX
+
+
+				.row
+					.col
+						+contentSection("Difficulty History")
+							each yearItem in yearItems
+								canvas(id=`graph-diff-hist-${yearItem[1]}`, class='graph-diff-hist')
+
+								
+
+				.row 
+					.col
+						.clearfix
+							.float-start
+								+sectionTitle("Difficulty Δ")
+							.float-start
+								small.text-muted.ms-2
+									| (%, clamped to ±100%)
+
+						+contentSection
+							each yearItem in yearItems
+								canvas(id=`graph-diff-change-${yearItem[1]}`, class='graph-diff-change')
+
+
+			+pageTab("Data")
+				.row
+					.col
+						+contentSection("Raw Data")
+							.table-responsive
+								table.table.table-striped.table-borderless.mb-3
+									thead
+										tr
+											th.text-end.text-card-highlight.text-uppercase.fw-light Epoch
+											th.text-end.text-card-highlight.text-uppercase.fw-light Start Block
+											th.text-end.text-card-highlight.fw-light
+												span.text-uppercase Start Date
+												small.ms-1 (utc)
+											//th Date
+											//th.text-end Block Start
+											th.text-end.text-card-highlight.text-uppercase.fw-light Difficulty
+											th.text-end.text-card-highlight.text-uppercase.fw-light Difficulty Δ
+												small.ms-1 (%)
+											
+											
+									tbody(id="difficulty-table-body")
+										tr(id="difficulty-table-row-prototype", style="display: none;")
+											td.text-end.data-epoch
+											td.text-end.data-start-block
+											td.text-end.data-start-date
+											//td.data-date
+											//td.text-end.data-block-start
+											td.text-end.data-difficulty
+											td.text-end.data-difficulty-delta
+											
+
+										tr(id="empty-row-to-fix-striped-coloring", style="display: none;")
+	
+
+
+block endOfBody
+	+graphPageScriptSetup
+	
+
+	script.
+		Chart.defaults.defaultFontSize = 14;
+
+	
+	script.
+		var blockCount = !{blockCount};
+		var yearItems = !{JSON.stringify(yearItems)};
+		
+		var heights = [];
+		var height = 0;
+		var chunkSize = 10;
+		var summary = null;
+
+		var RandomXAdjusted = false;
+
+		while (height <= blockCount) {
+			heights.push([height]);
+			height += !{coinConfig.difficultyAdjustmentBlockCount};
+		}
+
+		$(document).ready(function() {
+			var heightChunks = [];
+			
+			var currentChunk = [];
+			heightChunks.push(currentChunk);
+
+			for (var i = 0; i < heights.length; i++) {
+				if (currentChunk.length == chunkSize) {
+					currentChunk = [];
+					heightChunks.push(currentChunk);
+				}
+
+				currentChunk.push(heights[i]);
+			}
+
+			loadData(heightChunks.map(x => x.join(",")));
+
+		});
+
+		var results = {heights:[]};
+
+		function loadData(chunkStrs) {
+			//console.log(JSON.stringify(chunkStrs));
+
+			var statusCallback = function(chunkIndexDone, chunkCount) {
+				//console.log("Done: " + Math.min(((chunkIndexDone + 1) * chunkSize), count) + " of " + count);
+
+				var wPercent = `${parseInt(100 * (chunkIndexDone + 1) / parseFloat(chunkCount))}%`;
+				
+				$("#data-progress").css("width", wPercent);
+				$("#progress-text").text(`${Math.min(((chunkIndexDone + 1) * chunkSize), chunkStrs.length).toLocaleString()} of ${chunkStrs.length.toLocaleString()} (${wPercent})`);
+			};
+
+			var finishedCallback = function() {
+				summary = summarizeData(results,false);
+
+				fillDifficultyTable(summary);
+
+				for (var i = 0; i < yearItems.length; i++) {
+					createGraph(`graph-diff-hist-${yearItems[i][1]}`, [summary.graphData_years[yearItems[i][1]]], "Difficulty", true);
+				}
+
+				for (var i = 0; i < yearItems.length; i++) {
+					createGraph(`graph-diff-change-${yearItems[i][1]}`, [summary.changeGraphData_years[yearItems[i][1]]], "Difficulty Change %", false);
+				}
+
+				//createGraph("graph-diff-hist-2", summary.epochChunks, "Difficulty 2");
+				
+				$("#main-content").show();
+				$("#progress-wrapper").hide();
+
+				// only show the first graph (All Time)
+				$(`.graph-diff-hist`).hide();
+				$(`.graph-diff-change`).hide();
+
+				$(`#graph-diff-hist-${yearItems[0][1]}`).show();
+				$(`#graph-diff-change-${yearItems[0][1]}`).show();
+
+				$(`#diff-hist-selector-${yearItems[0][1]}`).removeClass("btn-outline-primary").addClass("btn-primary");
+			};
+
+			getData(results, chunkStrs, 0, statusCallback, finishedCallback);
+		}
+
+		function graphDiffHistory(numYears) {
+			let data = [];
+			let yearCount = 0;
+			for (let i = summary.graphData_years.length - 1; i >= 0; i--) {
+				data = data.concat(summary.graphData_years[i]);
+
+				yearCount++;
+				if (yearCount == numYears) {
+					break;
+				}
+			}
+
+			createGraph("graph-diff-hist", [data], "Difficulty", true);
+		}
+
+
+
+		function fillDifficultyTable(summary) {
+
+			//console.log("jQuery loaded:", typeof jQuery !== 'undefined');
+			//console.log("Element exists:", $("#difficulty-table-body").length > 0);
+			//console.log("Element by ID:", document.getElementById('difficulty-table-body'));
+			//console.log("Table size:",$("#difficulty-table-body").length);
+
+			//$("#difficulty-table-body").remove(); 
+
+			//console.log("Before empty - table rows:", $("#difficulty-table-body tr").length);
+			//$("#difficulty-table-body").empty();
+			// Remove all rows EXCEPT the prototype row
+			$("#difficulty-table-body tr:not(#difficulty-table-row-prototype)").remove();
+			//console.log("After empty - table rows:", $("#difficulty-table-body tr").length);
+
+			summary.difficultyData.reverse();
+			summary.difficultyDeltaData.reverse();
+
+			let latestBlockStart = 1000 * (summary.difficultyData.length - 1);
+
+			
+
+			for (var i = 0; i < summary.difficultyData.length; i++) {
+				var item = summary.difficultyData[i];
+				var deltaItem = summary.difficultyDeltaData[i];
+
+				// Added logs for debugging item and deltaItem details
+				//console.log("Item:", item);
+				//console.log("Delta Item:", deltaItem);
+
+				// Added checks to ensure item.difficulty and deltaItem.difficultyDelta are valid
+				if (typeof item.difficulty !== 'number' || isNaN(item.difficulty)) {
+					console.error("Invalid difficulty value:", item.difficulty);
+				}
+
+				if (deltaItem && (typeof deltaItem.difficultyDelta !== 'number' || isNaN(deltaItem.difficultyDelta))) {
+					console.error("Invalid difficulty delta value:", deltaItem.difficultyDelta);
+				}
+
+				var row = $("#difficulty-table-row-prototype").clone();
+				row.attr("id", null);
+				//row.addClass("fee-rate-table-row");
+
+				var startBlock = latestBlockStart - 1000 * i;
+				//var startBlock = 1000 * i;
+
+				row.find(".data-epoch").text(item.epoch);
+				row.find(".data-start-block").html(`<a href="./block-height/${startBlock}">${startBlock.toLocaleString()}</a>`);
+				row.find(".data-start-date").text(new Date(item.date * 1000).toISOString().slice(0, 10));
+				//row.find(".data-date").text(item.count.toLocaleString());
+				//row.find(".data-block-start").text(sumBlockCount.toDP(2));
+
+
+				// Apply the multiplier and format the difficulty consistently
+				//var displayedDifficulty = (applyMultiplier && startBlock > 70228)
+				//	? new Decimal(item.difficulty).times(100,000)
+				//	: new Decimal(item.difficulty);
+
+				var displayedDifficulty = new Decimal(item.difficulty);
+
+				if (displayedDifficulty.gte(1000000)) {
+					row.find(".data-difficulty").text(parseInt(displayedDifficulty).toLocaleString());
+				} else {
+					row.find(".data-difficulty").text(displayedDifficulty.toDP(3).toLocaleString());
+				}
+
+				if (deltaItem && typeof deltaItem.difficultyDelta !== 'undefined') {
+					 if (deltaItem.difficultyDelta > 0) {
+						row.find(".data-difficulty-delta").text("+" + (new Decimal(deltaItem.difficultyDelta).toDP(2)));
+						row.find(".data-difficulty-delta").addClass("text-success");
+					} else if (deltaItem.difficultyDelta < 0) {
+						row.find(".data-difficulty-delta").text(new Decimal(deltaItem.difficultyDelta).toDP(2));
+						row.find(".data-difficulty-delta").addClass("text-danger");
+					} else {
+						row.find(".data-difficulty-delta").text("0");
+						row.find(".data-difficulty-delta").removeClass("text-success text-danger");
+					}
+				} else {
+					console.warn("Invalid difficulty delta value:", deltaItem ? deltaItem.difficultyDelta : "undefined");
+					row.find(".data-difficulty-delta").text("-");
+					row.find(".data-difficulty-delta").removeClass("text-success text-danger");
+				}
+
+				row.show();
+
+				$("#difficulty-table-body").append(row);
+			}
+		}
+
+
+		var chartsById = {};
+		function createGraph(graphId, datas, yLabelStr, logY) {
+			if (chartsById[graphId]) {
+				chartsById[graphId].destroy();
+			}
+
+			var datasets = [];
+
+			for (var i = 0; i < datas.length; i++) {
+				datasets.push({
+					borderColor: '#007bff',
+					borderWidth: 2,
+					backgroundColor: 'rgba(0,0,0,0)',
+					data: datas[i],
+					pointRadius: 0
+				});
+			}
+
+			var ctx = document.getElementById(graphId).getContext('2d');
+			var graph = new Chart(ctx, {
+				type: 'line',
+				data: {
+					datasets: datasets
+				},
+				options: {
+					interaction: {
+						intersect: false,
+						mode: 'index',
+					},
+					plugins: {
+						legend: { display: false },
+					},
+					scales: {
+						x: {
+							type: 'linear',
+							position: 'bottom',
+							scaleLabel: {
+								display: true,
+								labelString: 'Difficulty Epoch'
+							},
+							grid: {
+								color: gridLineColor
+							},
+							//ticks: {
+							//	stepSize: 100,
+							//}
+						},
+						y: {
+							type: logY ? "logarithmic" : "linear",
+							scaleLabel: {
+								display: true,
+								labelString: yLabelStr
+							},
+							grid: {
+								color: gridLineColor
+							},
+							ticks: {
+								callback: function(value, index, values) {
+									if (value > 1000) {
+										var exp = Math.floor(Math.log10(value));
+										return (value / Math.pow(10, exp)).toLocaleString() + "e" + exp;
+
+									} else {
+										return value;
+									}
+								}
+							}
+						}
+					}
+				}
+			});
+
+			chartsById[graphId] = graph;
+		}
+
+		function getData(results, chunks, chunkIndex, statusCallback, finishedCallback) {
+			if (chunkIndex > chunks.length - 1) {
+				finishedCallback();
+
+				return;
+			}
+
+			var url = `./internal-api/difficulty-by-height/${chunks[chunkIndex]}`;
+			
+			//console.log(url);
+
+			$.ajax({
+				url: url
+
+			}).done(function(result) {
+				for (var height in result) {
+					results.heights.push(parseInt(height));
+
+					results[height] = result[height];
+				}
+
+				statusCallback(chunkIndex, chunks.length);
+				
+				getData(results, chunks, chunkIndex + 1, statusCallback, finishedCallback);
+			});
+		}
+
+		function showDataWithMultiplier(applyMultiplier) {
+
+			 if (!results || Object.keys(results).length === 0) {
+				 console.error("results object is not defined or is empty.");
+				 return;
+			}
+			// Generate a new summary object with or without the multiplier applied
+			var updatedSummary = summarizeData(results, applyMultiplier);
+
+			// Repopulate the table
+			fillDifficultyTable(updatedSummary);
+
+			// Update the graphs
+			for (var i = 0; i < yearItems.length; i++) {
+				createGraph(`graph-diff-hist-${yearItems[i][1]}`, [updatedSummary.graphData_years[yearItems[i][1]]], "Difficulty", true);
+			}
+
+			for (var i = 0; i < yearItems.length; i++) {
+				createGraph(`graph-diff-change-${yearItems[i][1]}`, [updatedSummary.changeGraphData_years[yearItems[i][1]]], "Difficulty Change %", false);
+			}
+		}
+
+		function summarizeData(raw, applyMultiplier = false) {
+			const blockHeightThreshold = 70228; // RandomX threshold
+
+			raw.heights.sort((a, b) => a - b);
+
+			var summary = {};
+			summary.difficultyData = [];
+			summary.difficultyDeltaData = [];
+
+			summary.graphData = [];
+			summary.graphData_years = {};
+			for (let i = 0; i < yearItems.length; i++) {
+				summary.graphData_years[yearItems[i][1]] = [];
+			}
+
+			summary.changeGraphData_years = {};
+			for (let i = 0; i < yearItems.length; i++) {
+				summary.changeGraphData_years[yearItems[i][1]] = [];
+			}
+
+			for (var i = 0; i < raw.heights.length; i++) {
+				var heightStr = `${raw.heights[i]}`;
+				//console.log(heightStr);
+				var previousHeightStr = `${raw.heights[i - 1]}`;
+				var difficulty = raw[heightStr].difficulty;
+				var date = raw[heightStr].time;
+
+				// Apply difficulty * 100000 if applyMultiplier is true and the block height is above the threshold
+				var modifiedDifficulty = (applyMultiplier && raw.heights[i] > blockHeightThreshold)
+				? difficulty * 100000
+				: difficulty;
+
+				//console.log("Difficulty:", difficulty);
+				//console.log("Modified Difficulty:", modifiedDifficulty);
+				
+
+				summary.difficultyData.push({ epoch: i, date: date, difficulty: modifiedDifficulty });
+
+				summary.graphData.push({ x: i, y: modifiedDifficulty });
+
+				// Populate year-specific graph data
+				var yearIndex = Math.floor((raw.heights.length - i) / 26);
+				for (let j = 0; j < yearItems.length; j++) {
+				if (yearIndex < yearItems[j][1]) {
+					summary.graphData_years[yearItems[j][1]].push({ x: i, y: modifiedDifficulty });
+				}
+				}
+
+				if (i == 0) {
+					for (let j = 0; j < yearItems.length; j++) {
+						if (yearIndex < yearItems[j][1]) {
+						summary.changeGraphData_years[yearItems[j][1]].push({ x: i, y: 0 });
+						}
+					}
+					summary.difficultyDeltaData.push({ epoch: i, difficultyDelta: 0 });
+				} else {
+
+					var previousDifficulty = raw[previousHeightStr].difficulty;
+					var previousModifiedDifficulty = (applyMultiplier && raw.heights[i-1] > blockHeightThreshold)
+						? previousDifficulty * 100000
+						: previousDifficulty;
+
+					// Calculate delta using modified difficulties
+					var deltaPercent = 100 * (modifiedDifficulty / previousModifiedDifficulty - 1);	
+
+					//var d1 = difficulty;
+					//var d0 = raw[previousHeightStr].difficulty;
+					//var deltaPercent = 100 * (d1 / d0 - 1);
+
+					summary.difficultyDeltaData.push({ epoch: i, difficultyDelta: deltaPercent });
+
+					if (deltaPercent > 100) deltaPercent = 100;
+					if (deltaPercent < -100) deltaPercent = -100;
+
+					for (let j = 0; j < yearItems.length; j++) {
+						if (yearIndex < yearItems[j][1]) {
+							summary.changeGraphData_years[yearItems[j][1]].push({ x: i, y: deltaPercent });
+						}
+					}
+				}
+			}
+
+			return summary;
+		}
+
+
+		function toggleDataDisplay() {
+			RandomXAdjusted = !RandomXAdjusted; // Toggle the state
+
+			// Update the button text based on the current state
+			if (RandomXAdjusted) {
+				$(".graph-toggle-btn").text("Show Original Data");
+				showDataWithMultiplier(true); // Show difficulty * 100000 above block height 70228
+			} else {
+				$(".graph-toggle-btn").text("Adjust For RandomX");
+				showDataWithMultiplier(false); // Show original difficulty data
+			}
+		}
+

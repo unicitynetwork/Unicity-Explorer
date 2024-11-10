@@ -1,0 +1,193 @@
+.table-responsive
+	table.table.table-borderless.table-striped.mb-0
+		thead
+			tr
+				//th
+
+				th.text-end.text-card-highlight.fw-normal.text-uppercase Height
+
+				//if (!hideTimestampColumn)
+				th.text-end.text-card-highlight.fw-normal.text-uppercase
+					span.border-dotted(title="Timestamp of the block.", data-bs-toggle="tooltip") Time
+
+				th.text-end.text-card-highlight.fw-normal.text-uppercase Age
+				
+				th.text-end.text-card-highlight.fw-normal.text-uppercase
+					span.border-dotted(title="<b>Time To Mine</b><br/>The time it took to mine this block after the previous block. <span class='text-success'>Fast</span> blocks (< 30secs) and <span class='text-danger'>Slow</span> blocks (> 4min) are highlighted.", data-bs-toggle="tooltip", data-bs-html="true") TTM
+				
+				th.text-end.text-card-highlight.fw-normal.text-uppercase
+					span.border-dotted(title="Difficulty of the block.", data-bs-toggle="tooltip") Diff
+			
+				th.text-end.text-card-highlight.fw-normal.text-uppercase
+					span.border-dotted(title="Size of the block in bytes.", data-bs-toggle="tooltip") Size
+
+				if (blockstatsByHeight)
+					th.text-end.text-card-highlight.fw-normal.text-uppercase.d-none.d-lg-table-cell
+						span.border-dotted(title="The total output of all transactions in each block.", data-bs-toggle="tooltip") Volume
+
+				th.text-start.text-card-highlight.fw-normal.text-uppercase.d-none.d-lg-table-cell
+						span.border-dotted(title="The payout address or public key  of the winning miner.", data-bs-toggle="tooltip") Miner
+				
+				//th.text-start.text-card-highlight.fw-normal.text-uppercase.d-none.d-lg-table-cell Miner
+
+				th.text-start.text-card-highlight.fw-normal.text-uppercase.d-none.d-lg-table-cell
+						span.border-dotted(title="RandomX Commitment", data-bs-toggle="tooltip") RX Commit
+				
+				
+				
+		tbody
+
+			each block, blockIndex in blocks
+
+				if (global.prunedBlockchain && global.pruneHeight == (block.height + 1))
+					tr
+						td.text-center(colspan="100%")
+							h6.my-3 
+								i.bi-backspace.text-danger.me-2
+								| Blocks older than this point have been 
+								i pruned
+								| , meaning that some or all data that is non-essential for blockchain verification has been deleted.
+
+
+				if (block && ((sort == "desc" && (blockIndex < blocks.length - 1 || block.height == 0)) || (sort == "asc" && (block.height == 0 || blockIndex > 0))))
+					tr
+						td.text-end
+						
+							a(href=`./block-height/${block.height}`) #{block.height.toLocaleString()} 
+				
+						console.log("Block:", block)
+						- var timeAgoTime = moment.utc(new Date()).diff(moment.utc(new Date(parseInt(block.time) * 1000)));
+						- var timeAgo = moment.duration(timeAgoTime);
+
+						- var timeDiff = null;
+						
+						if (sort == "asc")
+							if (blockIndex > 0)
+								- var timeDiff = moment.duration(moment.utc(new Date(parseInt(block.time) * 1000)).diff(moment.utc(new Date(parseInt(blocks[blockIndex - 1].time) * 1000))));
+						else
+							if (blockIndex < blocks.length - 1)
+								- var timeDiff = moment.duration(moment.utc(new Date(parseInt(block.time) * 1000)).diff(moment.utc(new Date(parseInt(blocks[blockIndex + 1].time) * 1000))));
+
+						//if (!hideTimestampColumn)
+						td.text-end
+							+timestamp(block.time, {includeAgo:false})
+							
+						td.text-end
+
+							if (sort != "asc" && blockIndex == 0 && offset == 0 && timeAgoTime > (4 * 60 * 1000))
+								span.text-danger.border-dotted(title="It's been > 4 min since this latest block.", data-bs-toggle="tooltip")
+									+timeAgo(block.time, {outputCommas:false, agoText:false})
+							else
+								+timeAgo(block.time, {outputCommas:false, agoText:false})
+
+						td.text-end
+							if (timeDiff)
+								- var colorClass = "";
+								if (timeDiff < 30000)
+									- var colorClass = "text-success";
+								if (timeDiff > 240000)
+									- var colorClass = "text-danger";
+
+								span(class=colorClass)
+									if (timeDiff == 0)
+										span 0:00
+									else
+										span #{timeDiff.format()}
+									
+									if (false)
+										if (timeDiff.asMinutes() < 1)
+											span #{parseInt(timeDiff.asSeconds())}s
+										else
+											span #{parseInt(timeDiff.asMinutes())}m #{parseInt(timeDiff.asSeconds())}s
+
+							else
+								if (block.height == 0)
+									small.border-dotted.text-muted(title="Not applicable: genesis block has no previous block to compare to.", data-bs-toggle="tooltip") N/A (genesis)
+								else
+									span.fw-light.text-muted -
+
+						td.text-end
+							if (block.difficulty)
+								// Retrieve and display the difficulty value from the block object
+								- var difficulty = block.difficulty;
+								span #{difficulty.toLocaleString()} 
+							else
+								span(title="Difficulty data is unavailable for this block", data-bs-toggle="tooltip")
+									i.bi-backspace.text-danger
+
+						if (block.size)
+							td.text-end
+								- var bSizeK = parseInt(block.size);
+								
+								span #{bSizeK.toLocaleString()} 
+								
+						else
+							td.text-end
+								span(title="This data is unavailable due to blockchain pruning", data-bs-toggle="tooltip")
+									i.bi-backspace.text-danger
+
+						if (blockstatsByHeight)
+							td.text-end.d-none.d-lg-table-cell
+								if (blockstatsByHeight[block.height])
+									- var satValue = new Decimal(blockstatsByHeight[block.height].total_out).plus(blockstatsByHeight[block.height].subsidy).plus(blockstatsByHeight[block.height].totalfee);
+									- var currencyValue = parseInt(satValue.dividedBy(coinConfig.baseCurrencyUnit.multiplier));
+									- var currencyValueDecimals = 0;
+
+									if (userSettings.displayCurrency == "alpha")
+										+valueDisplaySpecial(currencyValue, 0)
+
+									else
+										+valueDisplay(currencyValue)
+										
+
+									if (block.totalFees == null)
+										- block.totalFees = Decimal(blockstatsByHeight[block.height].totalfee).dividedBy(coinConfig.baseCurrencyUnit.multiplier)
+
+								else
+									span 0
+						
+						td.text-start.d-none.d-lg-table-cell
+							if (block.miner)
+								if (block.miner.type == "address-only")
+									span
+										.d-inline.d-md-none
+											span(data-bs-toggle="tooltip", title=`Unknown Miner Payout Address: ${block.miner.name}`) #{utils.ellipsizeMiddle(block.miner.name, 10)}
+
+										.d-none.d-md-inline
+											span(data-bs-toggle="tooltip", title=`Unknown Miner Payout Address: ${block.miner.name}`) #{utils.ellipsizeMiddle(block.miner.name, 14)}
+											+copyTextButton(block.miner.name)
+
+								else
+									.d-inline.d-sm-none
+										span.badge.bg-primary(data-bs-toggle="tooltip", data-bs-html="true", title=`Identified by: ${block.miner.identifiedBy}`) #{utils.ellipsize(block.miner.name, 12)}
+
+										if (block.miner.note)
+											i.bi-asterisk.ms-2(data-bs-toggle="tooltip", title=block.miner.note)
+
+									.d-none.d-sm-inline
+										span.badge.bg-primary(data-bs-toggle="tooltip", data-bs-html="true", title=`Identified by: ${block.miner.identifiedBy}`) #{utils.ellipsize(block.miner.name, 14)}
+
+										if (block.miner.note)
+											i.bi-asterisk.ms-2(data-bs-toggle="tooltip", title=block.miner.note)
+
+							else if (block.height < global.pruneHeight)
+								span(title="This data is unavailable due to blockchain pruning", data-bs-toggle="tooltip")
+									i.bi-backspace.text-danger
+										
+							else
+								span.badge.bg-secondary Unknown
+
+						td.text-start.d-none.d-lg-table-cell
+							if (true)
+								if (block.rx_cm)
+									span
+										.d-inline.d-md-none
+											span(data-bs-toggle="tooltip", title=`RandomX Commitment: ${block.rx_cm}`) #{utils.ellipsize(block.rx_cm, 10)}
+
+										.d-none.d-md-inline
+											span(data-bs-toggle="tooltip", title=`RandomX Committment: ${block.rx_cm}`) #{utils.ellipsize(block.rx_cm, 14)}
+											+copyTextButton(block.rx_cm)
+								else
+									span SHA256							
+						
+					- var lastBlock = block;

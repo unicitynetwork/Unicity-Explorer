@@ -1,0 +1,120 @@
+
+- var utxoCalculatingDesc = "At startup the app pulls a summary of the UTXO set. Until this summary is retrieved this data can't be displayed. Wait for the summary request to your node to return, then refresh this page.";
+
+
+				
++contentSection
+	+summaryRow(2 + (hashrate7d ? 1 : 0)  + (getnetworkinfo ? 1 :0)  + (difficultyAdjustmentData ? 1 : 0))
+		if (hashrate7d)
+			+summaryItem("7d Hashrate", "The average hashrate of the global mining network over the last 7 days. A comparison to the 30-day average is included to help gauge the rate of change.")
+				- var hashrate7dayData = utils.formatLargeNumber(hashrate7d, 1);
+
+				span.me-1 #{hashrate7dayData[0]}
+				span.small.text-muted.border-dotted(title=`${hashrate7dayData[1].abbreviation}H = ${hashrate7dayData[1].name}-hash (x10^${hashrate7dayData[1].exponent})` data-bs-toggle='tooltip') #{hashrate7dayData[1].abbreviation}H/s
+
+				if (hashrate30d)
+					- var ratio = hashrate7d / hashrate30d;
+
+					span.text-tiny.text-muted.ms-2
+						| (
+						span.border-dotted(title='7d hashrate vs 30d hashrate.' data-bs-toggle='tooltip')
+							if (ratio > 1)
+								- var ratioPercent = new Decimal(ratio).times(100).minus(100);
+								span.text-success +#{ratioPercent.toDP(2)}%
+
+							else
+								- var ratioPercent = new Decimal(100).minus(new Decimal(ratio).times(100));
+								span.text-danger -#{ratioPercent.toDP(2)}%
+
+						| )
+
+
+
+		if (getnetworkinfo)
+			+summaryItem("Peers", "Number of peers connected to this node.", null, null, "icon:bi-diagram-3", "./peers", "Details about the peers connected to this node")
+				span (#{getnetworkinfo.connections_in.toLocaleString()} in #{getnetworkinfo.connections_out.toLocaleString()} out)
+			
+
+		+summaryItem("Difficulty", null, null, null, "icon:bi-clock-history", "./difficulty-history", "View difficulty history")
+			- var difficultyData = utils.formatLargeNumber(getblockchaininfo.difficulty, 3);
+			
+			if (getblockchaininfo.difficulty > 1000)
+				span.border-dotted(title=parseFloat(getblockchaininfo.difficulty).toLocaleString(), data-bs-toggle="tooltip")
+					span #{difficultyData[0]}
+					span  x 10
+					sup #{difficultyData[1].exponent}
+
+			else
+				span #{new Decimal(getblockchaininfo.difficulty).toDP(3)}
+
+		if (latestBlocks && latestBlocks.length > 0 && latestBlocks[0])
+			+summaryItem("Rx Epoch", "RandomX epoch number")
+				if (latestBlocks[0].rx_epoch)
+					| #{latestBlocks[0].rx_epoch.toLocaleString()}
+				else
+					| SHA256
+
+
+		+summaryItem("Coins", utxoSetSummary ? null : (config.slowDeviceMode ? `Because this app is configured to conserve resources (SLOW_DEVICE_MODE=true), this value is estimated, using a checkpoint.` : `This value is estimated, using a checkpoint.`))
+						
+			- var maxSupply = coinConfig.maxSupplyByNetwork[activeBlockchain];
+
+			if (utxoSetSummary)
+				span #{parseFloat(utxoSetSummary.total_amount).toLocaleString()}
+				span.text-tiny.ms-2.text-muted
+					| (
+					span.border-dotted(title=`${new Decimal(utxoSetSummary.total_amount).dividedBy(maxSupply).times(100).toDP(5)}% have been mined into circulation`, data-bs-toggle="tooltip") #{new Decimal(utxoSetSummary.total_amount).dividedBy(maxSupply).times(100).toDP(2, Decimal.ROUND_DOWN)}%
+					| )
+
+			else
+				- var estimatedSupply = utils.estimatedSupply(getblockchaininfo.blocks);
+
+				span #{parseInt(estimatedSupply).toLocaleString()}
+				span.text-tiny.ms-2.text-muted
+					| (
+					span.border-dotted(title=`${estimatedSupply.dividedBy(maxSupply).times(100).toDP(4)}% have been mined into circulation`, data-bs-toggle="tooltip") #{estimatedSupply.dividedBy(maxSupply).times(100).toDP(1)}%
+					| )
+
+	hr.mt-3.mb-3
+
+	+summaryRow(4)
+		if (getblockchaininfo.size_on_disk)
+		+summaryItem("5 Block TTM", "Average time to mine the last 5 blocks.")
+			span #{averageBlockTimes.last5 ? Math.round(averageBlockTimes.last5) : 'N/A'} s
+
+		+summaryItem("20 Block TTM", "Average time to mine the last 20 blocks.")
+			span #{averageBlockTimes.last20 ? Math.round(averageBlockTimes.last20) : 'N/A'} s
+
+		+summaryItem("100 Block TTM", "Average time to mine the last 100 blocks.")
+			span #{averageBlockTimes.last100 ? Math.round(averageBlockTimes.last100) : 'N/A'} s
+
+		+summaryItem("1000 Block TTM", "Average time to mine the last 1000 blocks.")
+			span #{averageBlockTimes.last1000 ? Math.round(averageBlockTimes.last1000) : 'N/A'} s
+	
+	hr.mt-3.mb-3
+
+	+summaryRow(1 + (getblockchaininfo.size_on_disk ? 1 : 0) + (utxoSetSummary || utxoSetSummaryPending ? 1 : 0))
+
+		if (getblockchaininfo.size_on_disk)
+			+summaryItem("Disk Usage")
+				- var sizeData = utils.formatLargeNumber(getblockchaininfo.size_on_disk, 1);
+				| #{sizeData[0]} #{sizeData[1].abbreviation}B
+
+		+summaryItem("Total Hashes", "Estimate of the total work necessary to produce the blockchain, measured in 'hashes'.")
+			- var chainworkData = utils.formatLargeNumber(parseInt("0x" + getblockchaininfo.chainwork), 2);
+			span #{chainworkData[0]}
+			small.px-2.px-lg-0.px-xl-2 x
+			span 10
+			sup #{chainworkData[1].exponent}
+
+
+		if (utxoSetSummary || utxoSetSummaryPending)
+			+summaryItem("UTXOs", "The total number of unspent transaction outputs (spendable coin units).")
+				if (utxoSetSummary)
+					- var utxoCount = utils.formatLargeNumber(utxoSetSummary.txouts, 2);
+					//| #{utxoCount[0]} #{utxoCount[1].abbreviation}
+					| #{utxoSetSummary.txouts.toLocaleString()}
+				else
+					small.text-muted.border-dotted(title=utxoCalculatingDesc, data-bs-toggle="tooltip") calculating...
+
+
