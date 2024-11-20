@@ -30,11 +30,19 @@
 
 
 
-		if (getnetworkinfo)
-			+summaryItem("Peers", "Number of peers connected to this node.", null, null, "icon:bi-diagram-3", "./peers", "Details about the peers connected to this node")
-				span (#{getnetworkinfo.connections_in.toLocaleString()} in #{getnetworkinfo.connections_out.toLocaleString()} out)
-			
+		//if (getnetworkinfo)
+		//	+summaryItem("Peers", "Number of peers connected to this node.", null, null, "icon:bi-diagram-3", "./peers", "Details about the peers connected to this node")
+		//		//span (#{getnetworkinfo.connections_in.toLocaleString()} in #{getnetworkinfo.connections_out.toLocaleString()} out)
+		//		span #{peerSummary.getpeerinfo.length.toLocaleString()}
 
+		if (communityBalance)
+			+summaryItem("Community Balance", "Total balance in the community wallet")
+				+valueDisplaySpecial(communityBalance, 0)
+		else
+			+summaryItem("Community Balance", "Total balance in the community wallet")
+				span Not Available
+	
+			
 		+summaryItem("Difficulty", null, null, null, "icon:bi-clock-history", "./difficulty-history", "View difficulty history")
 			- var difficultyData = utils.formatLargeNumber(getblockchaininfo.difficulty, 3);
 			
@@ -55,12 +63,13 @@
 					| SHA256
 
 
-		+summaryItem("Coins", utxoSetSummary ? null : (config.slowDeviceMode ? `Because this app is configured to conserve resources (SLOW_DEVICE_MODE=true), this value is estimated, using a checkpoint.` : `This value is estimated, using a checkpoint.`))
+		+summaryItem("Circulating Supply", utxoSetSummary ? null : (config.slowDeviceMode ? `Because this app is configured to conserve resources (SLOW_DEVICE_MODE=true), this value is estimated, using a checkpoint.` : `This value is estimated, using a checkpoint.`))
 						
 			- var maxSupply = coinConfig.maxSupplyByNetwork[activeBlockchain];
 
 			if (utxoSetSummary)
-				span #{parseFloat(utxoSetSummary.total_amount).toLocaleString()}
+				//span #{parseFloat(utxoSetSummary.total_amount).toLocaleString()}
+				+valueDisplaySpecial(utxoSetSummary.total_amount, 0)
 				span.text-tiny.ms-2.text-muted
 					| (
 					span.border-dotted(title=`${new Decimal(utxoSetSummary.total_amount).dividedBy(maxSupply).times(100).toDP(5)}% have been mined into circulation`, data-bs-toggle="tooltip") #{new Decimal(utxoSetSummary.total_amount).dividedBy(maxSupply).times(100).toDP(2, Decimal.ROUND_DOWN)}%

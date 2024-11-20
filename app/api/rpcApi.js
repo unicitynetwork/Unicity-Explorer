@@ -71,6 +71,28 @@ function getMiningInfo() {
 	return getRpcData("getmininginfo");
 }
 
+function getCommunityBalance() {
+    return new Promise((resolve, reject) => {
+        // Ensure the global RPC connection is active
+        if (!global.rpcConnected) {
+            reject(new Error("No RPC connection available. Check your connection/authentication parameters."));
+            return;
+        }
+
+        debugLog("Fetching community balance...");
+
+        // Use the global RPC client with the wallet path already set
+        global.rpcClient.request("getbalance", [], (err, response) => {
+            if (err) {
+                debugLog(`Error fetching community balance: ${err.message}`);
+                return reject(err);
+            }
+
+            resolve(response.result);
+        });
+    });
+}
+
 function getIndexInfo() {
 	if (semver.gte(global.btcNodeSemver, minRpcVersions.getindexinfo)) {
 		return getRpcData("getindexinfo");
@@ -578,6 +600,7 @@ module.exports = {
 	getMempoolInfo: getMempoolInfo,
 	getAllMempoolTxids: getAllMempoolTxids,
 	getMiningInfo: getMiningInfo,
+	getCommunityBalance: getCommunityBalance,
 	getIndexInfo: getIndexInfo,
 	getBlockByHeight: getBlockByHeight,
 	getBlockByHash: getBlockByHash,

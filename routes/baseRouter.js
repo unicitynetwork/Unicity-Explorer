@@ -79,6 +79,10 @@ router.get("/", asyncHandler(async (req, res, next) => {
 			res.locals.miningInfo = await coreApi.getMiningInfo();
 		}, perfResults));
 
+		promises.push(utils.timePromise("peers.getPeerSummary", async () => {
+			res.locals.peerSummary = await coreApi.getPeerSummary();
+		}, perfResults));
+
 		promises.push(utils.timePromise("homepage.getSmartFeeEstimates", async () => {
 			const rawSmartFeeEstimates = await coreApi.getSmartFeeEstimates("CONSERVATIVE", feeConfTargets);
 
@@ -106,6 +110,10 @@ router.get("/", asyncHandler(async (req, res, next) => {
 			res.locals.hashrate30d = await coreApi.getNetworkHashrate(4320);
 		}, perfResults));
 
+		promises.push(utils.timePromise("homepage.getCommunityBalance", async () => {
+			res.locals.communityBalance = await coreApi.getCommunityBalance();
+		}, perfResults));
+
 
 
 		const getblockchaininfo = await utils.timePromise("homepage.getBlockchainInfo", async () => {
@@ -117,6 +125,8 @@ router.get("/", asyncHandler(async (req, res, next) => {
 
 		res.locals.difficultyPeriod = parseInt(Math.floor(getblockchaininfo.blocks / coinConfig.difficultyAdjustmentBlockCount));
 			
+
+
 
 		let blockHeights = [];
 		if (getblockchaininfo.blocks) {

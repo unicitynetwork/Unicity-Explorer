@@ -113,7 +113,7 @@ if (redisCache.active) {
 	const onRedisCacheEvent = function(cacheType, eventType, cacheKey) {
 		global.cacheStats.redis[eventType]++;
 		statTracker.trackEvent(`caches.redis.${eventType}`);
-		//debugLog(`cache.${cacheType}.${eventType}: ${cacheKey}`);
+		debugLog(`cache.${cacheType}.${eventType}: ${cacheKey}`);
 	}
 
 	// md5 of the active RPC credentials serves as part of the key; this enables
@@ -249,6 +249,10 @@ function getMiningInfo() {
 	return tryCacheThenRpcApi(miscCache, "getMiningInfo", 30 * ONE_SEC, rpcApi.getMiningInfo);
 }
 
+function getCommunityBalance() {
+	return tryCacheThenRpcApi(miscCache, "getCommunityBalance", 30 * ONE_SEC, rpcApi.getCommunityBalance);
+}
+
 function getUptimeSeconds() {
 	return tryCacheThenRpcApi(miscCache, "getUptimeSeconds", ONE_SEC, rpcApi.getUptimeSeconds);
 }
@@ -265,17 +269,12 @@ function getNetworkHashrate(blockCount) {
 	});
 }
 
-function getBlockStats(hash) {
-	return tryCacheThenRpcApi(miscCache, "getBlockStats-" + hash, FIFTEEN_MIN, function() {
-		return rpcApi.getBlockStats(hash);
-	});
-}
-
 function getBlockStatsByHeight(height) {
 	return tryCacheThenRpcApi(miscCache, "getBlockStatsByHeight-" + height, FIFTEEN_MIN, function() {
 		return rpcApi.getBlockStatsByHeight(height);
 	});
 }
+
 
 
 const utxoSetFileCache = utils.fileCache(config.filesystemCacheDir, `utxo-set`);
@@ -1579,6 +1578,7 @@ module.exports = {
 	getMempoolInfo: getMempoolInfo,
 	getAllMempoolTxids: getAllMempoolTxids,
 	getMiningInfo: getMiningInfo,
+	getCommunityBalance: getCommunityBalance,
 	getIndexInfo: getIndexInfo,
 	getBlockByHeight: getBlockByHeight,
 	getBlockHashByHeight: getBlockHashByHeight,
@@ -1605,7 +1605,6 @@ module.exports = {
 	getSmartFeeEstimate: getSmartFeeEstimate,
 	getUtxoSetSummary: getUtxoSetSummary,
 	getNetworkHashrate: getNetworkHashrate,
-	getBlockStats: getBlockStats,
 	getBlockStatsByHeight: getBlockStatsByHeight,
 	getBlocksStatsByHeight: getBlocksStatsByHeight,
 	buildBlockAnalysisData: buildBlockAnalysisData,

@@ -409,6 +409,11 @@ async function onRpcConnectionVerified(getnetworkinfo, getblockchaininfo) {
 	refreshUtxoSetSummary();
 	setInterval(refreshUtxoSetSummary, 30 * 60 * 1000);
 
+
+	 // Fetch immediately and refresh every 5 minutes
+	 refreshCommunityBalance();
+	 setInterval(refreshCommunityBalance, 15 * 60 * 1000);
+
 }
 
 async function loadDifficultyHistory(tipBlockHeight=null) {
@@ -444,6 +449,19 @@ async function loadDifficultyHistory(tipBlockHeight=null) {
 	debugLog("ATH difficulty: " + global.athDifficulty);
 }
 
+
+ // Fetch and cache the community balance
+ async function refreshCommunityBalance() {
+	try {
+		const balance = await rpcApi.getCommunityBalance();
+		global.communityBalance = balance;
+		debugLog(`Community Balance: ${balance}`);
+	} catch (err) {
+		debugErrorLog(`Failed to fetch community balance: ${err.message}`);
+	}
+}
+
+
 var txindexCheckCount = 0;
 async function assessTxindexAvailability() {
 	debugLog("txindex check: trying getindexinfo");
@@ -468,6 +486,21 @@ async function assessTxindexAvailability() {
 		debugLog("txindex check: unexpected error while accessing getindexinfo");
 	}
 }
+
+async function refreshCommunityBalance() {
+	
+	// flag that we're working on calculating UTXO details (to differentiate cases where we don't have the details and we're not going to try computing them)
+	global.utxoSetSummaryPending = true;
+
+	global.communityBalance = await coreApi.getCommunityBalance(true, false);
+
+	debugLog("Refreshed community balance: " + JSON.stringify(global.communityBalance));
+}
+
+
+
+
+
 
 async function refreshUtxoSetSummary() {
 	if (config.slowDeviceMode) {
@@ -616,9 +649,7 @@ expressApp.onStartup = async () => {
 }
 
 function connectToRpcServer() {
-	// reload credentials, the main "config.credentials.rpc" can be stale
-	// since the username/password can be sourced from the auth cookie
-	// which changes each startup of bitcoind
+	// Reload credentials to ensure they are fresh, as they might be stale.
 	let credentialsForRpcConnect = config.credentials.loadFreshRpcCredentials();
 
 	debugLog(`RPC Credentials: ${JSON.stringify(utils.obfuscateProperties(credentialsForRpcConnect, ["password"]), null, 4)}`);
@@ -634,32 +665,34 @@ function connectToRpcServer() {
 		port: rpcCred.port,
 		username: rpcCred.username,
 		password: rpcCred.password,
-		timeout: rpcCred.timeout
-	};
-
-	debugLog(`RPC Connection properties: ${JSON.stringify(utils.obfuscateProperties(rpcClientProperties, ["password"]), null, 4)}`);
-
-	// add after logging to avoid logging base64'd credentials
-	rpcClientProperties.headers = {
-		"Authorization": authorizationHeader
-	};
-
-	// main RPC client
-	global.rpcClient = jayson.Client.http(rpcClientProperties);
-
-	let rpcClientNoTimeoutProperties = {
-		host: rpcCred.host,
-		port: rpcCred.port,
-		username: rpcCred.username,
-		password: rpcCred.password,
-		timeout: 0,
+		timeout: rpcCred.timeout,
 		headers: {
 			"Authorization": authorizationHeader
 		}
 	};
 
-	// no timeout RPC client, for long-running commands
+	debugLog(`RPC Connection properties: ${JSON.stringify(utils.obfuscateProperties(rpcClientProperties, ["password"]), null, 4)}`);
+
+	// Main RPC client
+	global.rpcClient = jayson.Client.http(rpcClientProperties);
+
+	let rpcClientNoTimeoutProperties = {
+		...rpcClientProperties,
+		timeout: 0 // Set timeout to unlimited for long-running commands
+	};
+
+	// No-timeout RPC client for long-running commands
 	global.rpcClientNoTimeout = jayson.Client.http(rpcClientNoTimeoutProperties);
+
+	// Configure wallet path only if ALPHA_COMMUNITY_WALLET is defined
+	const communityWallet = process.env.ALPHA_COMMUNITY_WALLET;
+	if (communityWallet) {
+		debugLog(`Setting wallet to: ${communityWallet}`);
+		global.rpcClient.options.path = `/wallet/${communityWallet}`;
+		global.rpcClientNoTimeout.options.path = `/wallet/${communityWallet}`;
+	} else {
+		debugLog("Environment variable ALPHA_COMMUNITY_WALLET is not defined. Skipping wallet configuration.");
+	}
 }
 
 expressApp.continueStartup = function() {

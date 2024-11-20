@@ -134,7 +134,6 @@ module.exports = {
 		"generatetoaddress",
 		"getaccountaddrss",
 		"getaddressesbyaccount",
-		"getbalance",
 		"getnewaddress",
 		"getrawchangeaddress",
 		"getreceivedbyaccount",
