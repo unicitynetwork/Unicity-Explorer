@@ -217,12 +217,12 @@ module.exports = {
 			{name: "Fun", items: [8, 17, 19, 13]},
 		]
 	*/
-		prioritizedToolIdsList: [0, 4, 5, 3, 6, 2, 5, 1, 4],
+		prioritizedToolIdsList: [0, 4, 5, 3, 6, 2, 5, 4],
 		toolSections: [
 			{name: "Basics", items: [0, 2]},
 			{name: "Mempool", items: []},
 			{name: "Analysis", items: [ 8, 4, 5, 3, 6, 9]},
-			{name: "Technical", items: [1,7]}
+			{name: "Technical", items: [7]}
 		]
 	},
 

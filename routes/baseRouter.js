@@ -295,61 +295,62 @@ router.get("/node-details", asyncHandler(async (req, res, next) => {
 }));
 
 
+if (false){
+	router.get("/peers", asyncHandler(async (req, res, next) => {
+		try {
+			const { perfId, perfResults } = utils.perfLogNewItem({action:"peers"});
+			res.locals.perfId = perfId;
 
-router.get("/peers", asyncHandler(async (req, res, next) => {
-	try {
-		const { perfId, perfResults } = utils.perfLogNewItem({action:"peers"});
-		res.locals.perfId = perfId;
+			const promises = [];
 
-		const promises = [];
+			promises.push(utils.timePromise("peers.getPeerSummary", async () => {
+				res.locals.peerSummary = await coreApi.getPeerSummary();
+			}, perfResults));
 
-		promises.push(utils.timePromise("peers.getPeerSummary", async () => {
-			res.locals.peerSummary = await coreApi.getPeerSummary();
-		}, perfResults));
+			
+			await utils.awaitPromises(promises);
 
-		
-		await utils.awaitPromises(promises);
+			let peerSummary = res.locals.peerSummary;
 
-		let peerSummary = res.locals.peerSummary;
-
-		let peerIps = [];
-		for (let i = 0; i < peerSummary.getpeerinfo.length; i++) {
-			let ipWithPort = peerSummary.getpeerinfo[i].addr;
-			if (ipWithPort.lastIndexOf(":") >= 0) {
-				let ip = ipWithPort.substring(0, ipWithPort.lastIndexOf(":"));
-				if (ip.trim().length > 0) {
-					peerIps.push(ip.trim());
+			let peerIps = [];
+			for (let i = 0; i < peerSummary.getpeerinfo.length; i++) {
+				let ipWithPort = peerSummary.getpeerinfo[i].addr;
+				if (ipWithPort.lastIndexOf(":") >= 0) {
+					let ip = ipWithPort.substring(0, ipWithPort.lastIndexOf(":"));
+					if (ip.trim().length > 0) {
+						peerIps.push(ip.trim());
+					}
 				}
 			}
-		}
 
-		if (peerIps.length > 0) {
-			res.locals.peerIpSummary = await utils.timePromise("peers.geoLocateIpAddresses", async () => {
-				return await utils.geoLocateIpAddresses(peerIps)
+			if (peerIps.length > 0) {
+				res.locals.peerIpSummary = await utils.timePromise("peers.geoLocateIpAddresses", async () => {
+					return await utils.geoLocateIpAddresses(peerIps)
+				}, perfResults);
+				
+				res.locals.mapBoxComApiAccessKey = config.credentials.mapBoxComApiAccessKey;
+			}
+
+
+			await utils.timePromise("peers.render", async () => {
+				res.render("peers");
 			}, perfResults);
-			
-			res.locals.mapBoxComApiAccessKey = config.credentials.mapBoxComApiAccessKey;
+
+			next();
+
+		} catch (err) {
+			utils.logError("394rhweghe", err);
+						
+			res.locals.userMessage = "Error: " + err;
+
+			await utils.timePromise("peers.render", async () => {
+				res.render("peers");
+			});
+
+			next();
 		}
-
-
-		await utils.timePromise("peers.render", async () => {
-			res.render("peers");
-		}, perfResults);
-
-		next();
-
-	} catch (err) {
-		utils.logError("394rhweghe", err);
-					
-		res.locals.userMessage = "Error: " + err;
-
-		await utils.timePromise("peers.render", async () => {
-			res.render("peers");
-		});
-
-		next();
-	}
-}));
+	}));
+}
 
 router.post("/connect", function(req, res, next) {
 	let host = req.body.host;
