@@ -1,7 +1,7 @@
 {
-	"name": "alpha-rpc-explorer",
+	"name": "unicity-rpc-explorer",
 	"version": "1.0.0",
-	"description": "Open-source, self-hosted Alpha explorer",
+	"description": "Open-source, self-hosted Unicity L1 explorer",
 	"private": false,
 	"bin": "bin/cli.js",
 	"scripts": {
@@ -26,14 +26,13 @@
 		"unicity",
 		"blockchain"
 	],
-	"author": "Dan Janosik <dan@47.io>",
+	"author": "Makoto Sakuyama <makoto.sakuyama@proton.me>",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/janoside/btc-rpc-explorer.git"
+		"url": "git+https://github.com/unicitynetwork/alpha-rpc-explorer.git"
 	},
 	"dependencies": {
-		"@janoside/app-utils": "github:janoside/app-utils#ba4c23d3f",
 		"async": "^3.2.4",
 		"axios": "^1.7.4",
 		"basic-auth": "^2.0.1",

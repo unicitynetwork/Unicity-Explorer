@@ -254,7 +254,7 @@ process.on("unhandledRejection", (reason, p) => {
 });
 
 
-
+//TODO
 async function getSourcecodeProjectMetadata() {
 	var options = {
 		url: "https://api.github.com/repos/unicitynetwork/alpha-rpc-explorer",
@@ -380,7 +380,7 @@ async function onRpcConnectionVerified(getnetworkinfo, getblockchaininfo) {
 		// short-circuit: force all RPC calls to pass their version checks - this will likely lead to errors / instability / unexpected results
 		global.btcNodeSemver = "1000.1000.0"
 
-		debugErrorLog(`Unable to parse node version string: ${getnetworkinfo.subversion} - RPC versioning will likely be unreliable. Is your node running Alpha?`);
+		debugErrorLog(`Unable to parse node version string: ${getnetworkinfo.subversion} - RPC versioning will likely be unreliable. Is your node running ?`);
 	}
 	
 	debugLog(`RPC Connected: version=${getnetworkinfo.version} subversion=${getnetworkinfo.subversion}, parsedVersion(used for RPC versioning)=${global.btcNodeSemver}, protocolversion=${getnetworkinfo.protocolversion}, chain=${getblockchaininfo.chain}, services=${services}`);
@@ -684,14 +684,14 @@ function connectToRpcServer() {
 	// No-timeout RPC client for long-running commands
 	global.rpcClientNoTimeout = jayson.Client.http(rpcClientNoTimeoutProperties);
 
-	// Configure wallet path only if ALPHA_COMMUNITY_WALLET is defined
-	const communityWallet = process.env.ALPHA_COMMUNITY_WALLET;
+	// Configure wallet path only if UNICITY_COMMUNITY_WALLET is defined
+	const communityWallet = process.env.UNCITY_COMMUNITY_WALLET;
 	if (communityWallet) {
 		debugLog(`Setting wallet to: ${communityWallet}`);
 		global.rpcClient.options.path = `/wallet/${communityWallet}`;
 		global.rpcClientNoTimeout.options.path = `/wallet/${communityWallet}`;
 	} else {
-		debugLog("Environment variable ALPHA_COMMUNITY_WALLET is not defined. Skipping wallet configuration.");
+		debugLog("Environment variable UNICITY_COMMUNITY_WALLET is not defined. Skipping wallet configuration.");
 	}
 }
 

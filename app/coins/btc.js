@@ -72,7 +72,7 @@ module.exports = {
 		"main": "#F7931A",
 	},
 	siteTitlesByNetwork: {
-		"main":"Alpha Explorer",
+		"main":"Unicity L1 Explorer",
 	},
 	demoSiteUrlsByNetwork: {
 		"main": "https://bitcoinexplorer.org",
