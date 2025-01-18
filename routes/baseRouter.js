@@ -891,7 +891,7 @@ router.get("/block/:blockHash", asyncHandler(async (req, res, next) => {
 			}
 
 		} else {
-			res.locals.metaTitle = `Alpha Block ${utils.ellipsizeMiddle(res.locals.result.getblock.hash, 16)}`;
+			res.locals.metaTitle = `Block ${utils.ellipsizeMiddle(res.locals.result.getblock.hash, 16)}`;
 			res.locals.metaDesc = "";
 		}
 

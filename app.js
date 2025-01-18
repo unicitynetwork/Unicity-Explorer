@@ -685,7 +685,7 @@ function connectToRpcServer() {
 	global.rpcClientNoTimeout = jayson.Client.http(rpcClientNoTimeoutProperties);
 
 	// Configure wallet path only if UNICITY_COMMUNITY_WALLET is defined
-	const communityWallet = process.env.UNCITY_COMMUNITY_WALLET;
+	const communityWallet = process.env.UNICITY_COMMUNITY_WALLET;
 	if (communityWallet) {
 		debugLog(`Setting wallet to: ${communityWallet}`);
 		global.rpcClient.options.path = `/wallet/${communityWallet}`;

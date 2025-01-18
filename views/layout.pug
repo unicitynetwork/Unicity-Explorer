@@ -9,7 +9,7 @@ html(lang="en")
 		meta(name="csrf-token", content=csrfToken)
 		meta(name="viewport", content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, shrink-to-fit=no")
 
-		meta(name="description" content="Open-source,  Unicity Consensus Layer Explorer")
+		meta(name="description" content="Unicity Block Explorer")
 		
 		if (!homepage)
 			link(rel="stylesheet", href=assetUrl(`./style/highlight.min.css`), integrity=assetIntegrity("highlight.min.css"), crossorigin="anonymous")
@@ -20,8 +20,8 @@ html(lang="en")
 
 		link(id="canonical" rel="canonical" href="https://unicity.network")
 
-		meta(property="og:title" content=(metaTitle != undefined ? metaTitle : "Unicity Consensus Layer Explorer"))
-		meta(property="og:description" content=(metaDesc != undefined ? metaDesc : "Unicity Consensus Layer Explorer."))
+		meta(property="og:title" content=(metaTitle != undefined ? metaTitle : "Unicity BlockExplorer"))
+		meta(property="og:description" content=(metaDesc != undefined ? metaDesc : "Unicity Block Explorer."))
 		meta(property="og:image" content="https://unicity.network/img/preview.png")
 
 	
@@ -34,8 +34,8 @@ html(lang="en")
 		//link(rel="shortcut icon", href="./img/network-mainnet/favicon.ico")
 		//link(rel="icon", type="image/png", sizes="32x32", href=assetUrl("./img/network-mainnet/favicon-32x32.png"))
 		
-		meta(name="apple-mobile-web-app-title", content="Unicity Consensus Layer Explorer")
-		meta(name="application-name", content="Unicity Consensus Layer Explorer")
+		meta(name="apple-mobile-web-app-title", content="Unicity Block Explorer")
+		meta(name="application-name", content="Unicity Block  Explorer")
 		meta(name="msapplication-TileColor", content="#022e70")
 		meta(name="msapplication-config", content="./img/network-mainnet/browserconfig.xml")
 		meta(name="theme-color" content="#022e70")
@@ -52,7 +52,7 @@ html(lang="en")
 					span
 						//+ "?v=" + Date.now()
 						img.header-image(src=assetUrl("./img/network-mainnet/logo.svg"), alt="logo", style="width: 80px; height: 80px;")
-						span.fw-light Unicity Consensus Layer Explorer
+						span.fw-light Unicity Block Explorer
 						
 				button.navbar-toggler.navbar-toggler-end(type="button", data-bs-toggle="collapse", data-bs-target="#navbarNav", aria-label="collapse navigation")
 					span.navbar-toggler-icon
