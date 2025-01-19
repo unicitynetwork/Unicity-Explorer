@@ -9,7 +9,7 @@ html(lang="en")
 		meta(name="csrf-token", content=csrfToken)
 		meta(name="viewport", content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, shrink-to-fit=no")
 
-		meta(name="description" content="Unicity Block Explorer")
+		meta(name="description" content=" Block Explorer")
 		
 		if (!homepage)
 			link(rel="stylesheet", href=assetUrl(`./style/highlight.min.css`), integrity=assetIntegrity("highlight.min.css"), crossorigin="anonymous")
@@ -20,7 +20,7 @@ html(lang="en")
 
 		link(id="canonical" rel="canonical" href="https://unicity.network")
 
-		meta(property="og:title" content=(metaTitle != undefined ? metaTitle : "Unicity BlockExplorer"))
+		meta(property="og:title" content=(metaTitle != undefined ? metaTitle : "Unicity Block Explorer"))
 		meta(property="og:description" content=(metaDesc != undefined ? metaDesc : "Unicity Block Explorer."))
 		meta(property="og:image" content="https://unicity.network/img/preview.png")
 
@@ -52,7 +52,7 @@ html(lang="en")
 					span
 						//+ "?v=" + Date.now()
 						img.header-image(src=assetUrl("./img/network-mainnet/logo.svg"), alt="logo", style="width: 80px; height: 80px;")
-						span.fw-light Unicity Block Explorer
+						span.fw-light Block Explorer
 						
 				button.navbar-toggler.navbar-toggler-end(type="button", data-bs-toggle="collapse", data-bs-target="#navbarNav", aria-label="collapse navigation")
 					span.navbar-toggler-icon
