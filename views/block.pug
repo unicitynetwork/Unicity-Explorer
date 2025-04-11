@@ -173,14 +173,14 @@ block content
 						+summaryRow(3)
 							+summaryItem("Rx Hash", "RandomX Hash Value included in block header")
 								| #{utils.ellipsize(result.getblock.rx_hash, 12)}
-								+copyTextButton(result.getblock.rxhash)
+								+copyTextButton(result.getblock.rx_hash)
 
-							+summaryItem("Rx Commitment", "RandomX Commitment (lightweight first step in caluclating the hash)")
+							+summaryItem("Rx Commitment", "RandomX Commitment (lightweight first step in calculating the hash)")
 								| #{utils.ellipsize(result.getblock.rx_cm, 12)}
-								+copyTextButton(result.getblock.cm)
+								+copyTextButton(result.getblock.rx_cm)
 
-							+summaryItem("Rx Epoch", "RandomX Epoch Number)")
-								| result.getblock.rx_epoch
+							+summaryItem("Rx Epoch", "RandomX Epoch Number")
+								| #{result.getblock.rx_epoch}
 								
 								
 				+contentSection("Technical Details", true, "blockPageShowTechSummary")

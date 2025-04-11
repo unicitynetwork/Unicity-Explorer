@@ -124,7 +124,8 @@ html(lang="en")
 
 									.btn-group.ms-3
 										each item in items
-											if (userSettings.displayCurrency == item.toLowerCase())
+											- var displayCurrency = userSettings && userSettings.displayCurrency ? userSettings.displayCurrency : "alpha"
+											if (displayCurrency == item.toLowerCase())
 												span.btn.btn-primary.btn-sm #{item}
 
 											else
@@ -143,7 +144,8 @@ html(lang="en")
 													.float-start
 														span #{item}
 													.float-end
-														if (userSettings.localCurrency == item.toLowerCase())
+														- var localCurrency = userSettings && userSettings.localCurrency ? userSettings.localCurrency : "usd"
+														if (localCurrency == item.toLowerCase())
 															i.bi-check2
 
 									hr.dropdown-divider.mt-2.mb-2
@@ -159,7 +161,8 @@ html(lang="en")
 										- let themeIconColors = ["text-warning", "", ""];
 
 										each themeName, themeIndex in themeNames
-											a.btn.btn-sm.px-3(id=`theme-toggler-${themeName}`, href=`javascript:void(0);` onclick=`activateTheme('${themeName}'); return false;`, class=(userSettings.uiTheme == themeName ? "btn-primary" : "btn-outline-primary"))
+											- var userTheme = userSettings && userSettings.uiTheme ? userSettings.uiTheme : "dark"
+											a.btn.btn-sm.px-3(id=`theme-toggler-${themeName}`, href=`javascript:void(0);` onclick=`activateTheme('${themeName}'); return false;`, class=(userTheme == themeName ? "btn-primary" : "btn-outline-primary"))
 												i(class=themeIcons[themeIndex], class=themeIconColors[themeIndex])
 
 
@@ -171,8 +174,9 @@ html(lang="en")
 										- items.push("local");
 
 									.btn-group.ms-3
-										a.btn.btn-sm.px-3(href=`./changeSetting?name=uiTimezone&value=utc`, class=(userSettings.uiTimezone == "utc" ? "btn-primary" : "btn-outline-primary")) UTC
-										a.btn.btn-sm.px-3(href=`./changeSetting?name=uiTimezone&value=local`, class=(userSettings.uiTimezone == "utc" ? "btn-outline-primary" : "btn-primary")) Local
+										- var uiTimezone = userSettings && userSettings.uiTimezone ? userSettings.uiTimezone : "utc"
+										a.btn.btn-sm.px-3(href=`./changeSetting?name=uiTimezone&value=utc`, class=(uiTimezone == "utc" ? "btn-primary" : "btn-outline-primary")) UTC
+										a.btn.btn-sm.px-3(href=`./changeSetting?name=uiTimezone&value=local`, class=(uiTimezone == "utc" ? "btn-outline-primary" : "btn-primary")) Local
 
 									p.px-3.pt-2.small.text-muted "Local" uses your browser's default offset:
 										span#browser-tz-offset.badge.bg-light.text-dark.ms-1.border

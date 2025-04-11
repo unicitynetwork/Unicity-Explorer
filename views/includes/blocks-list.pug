@@ -133,7 +133,8 @@
 									- var currencyValue = parseInt(satValue.dividedBy(coinConfig.baseCurrencyUnit.multiplier));
 									- var currencyValueDecimals = 0;
 
-									if (userSettings.displayCurrency == "alpha")
+									- var displayCurrency = userSettings && userSettings.displayCurrency ? userSettings.displayCurrency : "alpha"
+									if (displayCurrency == "alpha")
 										+valueDisplaySpecial(currencyValue, 0)
 
 									else
