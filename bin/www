@@ -2,7 +2,7 @@
 
 "use strict";
 
-const debug = require('debug')('www');
+const debug = require('debug')('btcexp:www');
 const app = require('../app');
 
 const v8 = require('v8');
