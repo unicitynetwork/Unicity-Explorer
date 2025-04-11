@@ -686,6 +686,7 @@ function connectToRpcServer() {
 
 	// Configure wallet path only if UNICITY_COMMUNITY_WALLET is defined
 	const communityWallet = process.env.UNICITY_COMMUNITY_WALLET;
+	console.log("communityWallet variable:", communityWallet);
 	if (communityWallet) {
 		debugLog(`Setting wallet to: ${communityWallet}`);
 		global.rpcClient.options.path = `/wallet/${communityWallet}`;
