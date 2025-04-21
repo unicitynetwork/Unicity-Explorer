@@ -1016,7 +1016,7 @@ router.get("/tx/:transactionId", asyncHandler(async (req, res, next) => {
 
 		res.locals.tx = tx;
 		res.locals.isCoinbaseTx = tx.vin[0].coinbase;
-		console.log("tx Hello world", tx.vin[0].coinbase);		
+		//console.log("tx Hello world", tx.vin[0].coinbase);		
 		res.locals.result.getrawtransaction = tx;
 		res.locals.result.txInputs = rawTxResult.txInputsByTransaction[txid] || {};
 

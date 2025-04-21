@@ -951,7 +951,8 @@ if (expressApp.get("env") === "development" || expressApp.get("env") === "local"
 		res.status(err.status || 500);
 		res.render('error', {
 			message: err.message,
-			error: err
+			error: err,
+			env: expressApp.get('env')
 		});
 	});
 }
@@ -966,7 +967,8 @@ expressApp.use(function(err, req, res, next) {
 	res.status(err.status || 500);
 	res.render('error', {
 		message: err.message,
-		error: {}
+		error: {},
+		env: expressApp.get('env')
 	});
 });
 

@@ -1593,6 +1593,7 @@ module.exports = {
 	getBlockByHash: getBlockByHash,
 	getBlocksByHash: getBlocksByHash,
 	getBlockByHashWithTransactions: getBlockByHashWithTransactions,
+	getBlockStats: getBlockStats,
 	getRawTransaction: getRawTransaction,
 	getRawTransactions: getRawTransactions,
 	getRawTransactionsWithInputs: getRawTransactionsWithInputs,

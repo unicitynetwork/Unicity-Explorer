@@ -31,12 +31,12 @@ block content
 			+contentSection("Status")
 				| #{error.status}
 
-		+contentSection("Stack")
-			if (error.stack)
-				pre.text-tiny(style="white-space: pre;") #{error.stack}
+		if (env === "development" || env === "local")
+			+contentSection("Stack")
+				if (error.stack)
+					pre.text-tiny(style="white-space: pre;") #{error.stack}
+				else
+					span.text-muted (unavailable)
 
-			else
-				span.text-muted (unavailable)
-
-		+contentSection("Error Object")
-			pre #{JSON.stringify(error, null, 4)}
+			+contentSection("Error Object")
+				pre #{JSON.stringify(error, null, 4)}
