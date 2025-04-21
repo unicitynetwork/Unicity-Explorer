@@ -270,6 +270,12 @@ function getNetworkHashrate(blockCount) {
 	});
 }
 
+function getBlockStats(hash) {
+	return tryCacheThenRpcApi(miscCache, "getBlockStats-" + hash, FIFTEEN_MIN, function() {
+		return rpcApi.getBlockStats(hash);
+	});
+}
+
 function getBlockStatsByHeight(height) {
 	return tryCacheThenRpcApi(miscCache, "getBlockStatsByHeight-" + height, FIFTEEN_MIN, function() {
 		return rpcApi.getBlockStatsByHeight(height);
