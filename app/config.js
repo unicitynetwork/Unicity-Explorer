@@ -42,8 +42,22 @@ const cookieSecret = process.env.BTCEXP_COOKIE_SECRET
  || (rpcCred.password && crypto.createHmac('sha256', JSON.stringify(rpcCred))
                                .update('btc-rpc-explorer-cookie-secret').digest('hex'))
  || "0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f";
+ 
 
 
+// const electrumServerUriStrings = (process.env.BTCEXP_ELECTRUM_SERVERS || process.env.BTCEXP_ELECTRUMX_SERVERS || "").split(',').filter(Boolean);
+// const electrumServers = [];
+// for (let i = 0; i < electrumServerUriStrings.length; i++) {
+//   const uri = url.parse(electrumServerUriStrings[i]);
+//   
+//   electrumServers.push({protocol:uri.protocol.substring(0, uri.protocol.length - 1), host:uri.hostname, port:parseInt(uri.port)});
+// }
+
+// Configure static local Electrum server
+const electrumServers = [
+  // Standard TCP connection
+  { protocol: 'tcp', host: '127.0.0.1', port: 50001 }
+];
 
 // default=false env vars
 [
@@ -84,6 +98,12 @@ module.exports = {
 
 	baseUrl: baseUrl,
 	apiBaseUrl: apiDocs.baseUrl,
+	
+	// Set address API to use Electrum
+	addressApi: "electrum",
+	
+	// Add electrumServers to exports
+	electrumServers: electrumServers,
 
 	coin: currentCoin,
 

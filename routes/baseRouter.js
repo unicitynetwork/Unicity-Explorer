@@ -26,6 +26,8 @@ const config = require("./../app/config.js");
 const coreApi = require("./../app/api/coreApi.js");
 const rpcApi = require("./../app/api/rpcApi.js");
 
+const addressApi = require('../app/api/addressApi.js');
+
 
 const forceCsrf = csrfApi({ ignoreMethods: [] });
 
@@ -186,7 +188,7 @@ router.get("/", asyncHandler(async (req, res, next) => {
 				
 				const timeDiff = startBlock.time - endBlock.time;
 				const average = timeDiff / blockCount;
-				console.log("average", average);
+				//console.log("average", average);
 				return average;
 			};
 
@@ -652,7 +654,7 @@ router.post("/search", function(req, res, next) {
 		return res.redirect("./tx/" + query);
 	}
 
-	//let parseAddressData = utils.tryParseAddress(rawCaseQuery);
+	let parseAddressData = utils.tryParseAddress(rawCaseQuery);
 
 	if (false) {
 		if (parseAddressData.errors) {
@@ -662,10 +664,10 @@ router.post("/search", function(req, res, next) {
 		}
 	}
 
-	//if (parseAddressData.parsedAddress) {
-	//	res.redirect("./address/" + rawCaseQuery);
+	if (parseAddressData.parsedAddress) {
+		res.redirect("./address/" + rawCaseQuery);
 
-	if (query.length == 64) {
+	}else if (query.length == 64) {
 		coreApi.getRawTransaction(query).then(function(tx) {
 			res.redirect("./tx/" + query);
 
@@ -1083,6 +1085,262 @@ router.get("/tx/:transactionId", asyncHandler(async (req, res, next) => {
 
 		await utils.timePromise("tx.render", async () => {
 			res.render("transaction");
+		});
+
+		next();
+	}
+}));
+
+router.get("/address/:address", asyncHandler(async (req, res, next) => {
+	let address = utils.asAddress(req.params.address);
+
+	try {
+		const { perfId, perfResults } = utils.perfLogNewItem({action:"address"});
+		res.locals.perfId = perfId;
+
+		let limit = config.site.addressTxPageSize;
+		let offset = 0;
+		let sort = "desc";
+
+		res.locals.maxTxOutputDisplayCount = config.site.addressPage.txOutputMaxDefaultDisplay;
+
+		
+		if (req.query.limit) {
+			limit = parseInt(req.query.limit);
+
+			// for demo sites, limit page sizes
+			if (config.demoSite && limit > config.site.addressTxPageSize) {
+				limit = config.site.addressTxPageSize;
+
+				res.locals.userMessage = "Transaction page size limited to " + config.site.addressTxPageSize + ". If this is your site, you can change or disable this limit in the site config.";
+			}
+		}
+
+		if (req.query.offset) {
+			offset = parseInt(req.query.offset);
+		}
+
+		if (req.query.sort) {
+			sort = req.query.sort;
+		}
+
+
+		res.locals.metaTitle = `Alpha Address ${address}`;
+
+		res.locals.address = address;
+		res.locals.limit = limit;
+		res.locals.offset = offset;
+		res.locals.sort = sort;
+		res.locals.paginationBaseUrl = `./address/${address}?sort=${sort}`;
+		res.locals.transactions = [];
+		res.locals.addressApiSupport = addressApi.getCurrentAddressApiFeatureSupport();
+		
+		res.locals.result = {};
+
+		let parseAddressData = utils.tryParseAddress(address);
+
+		if (parseAddressData.parsedAddress) {
+			//console.log("address.parse: " + JSON.stringify(parseAddressData));
+
+			res.locals.addressObj = parseAddressData.parsedAddress;
+			res.locals.addressEncoding = parseAddressData.encoding;
+
+		} else if (parseAddressData.errors) {
+			parseAddressData.errors.forEach(err => {
+				res.locals.pageErrors.push(utils.logError("ParseAddressError", err));
+			});
+		}
+
+
+		// Mining pools configuration disabled
+		/*if (global.miningPoolsConfigs) {
+			for (let i = 0; i < global.miningPoolsConfigs.length; i++) {
+				if (global.miningPoolsConfigs[i].payout_addresses[address]) {
+					res.locals.payoutAddressForMiner = global.miningPoolsConfigs[i].payout_addresses[address];
+				}
+			}
+		}*/
+
+
+
+		const validateaddressResult = await coreApi.getAddress(address);
+		res.locals.result.validateaddress = validateaddressResult;
+
+		let promises = [];
+
+		if (!res.locals.crawlerBot) {
+			let addrScripthash = hexEnc.stringify(sha256(hexEnc.parse(validateaddressResult.scriptPubKey)));
+			addrScripthash = addrScripthash.match(/.{2}/g).reverse().join("");
+
+			res.locals.electrumScripthash = addrScripthash;
+
+			promises.push(utils.timePromise("address.getAddressDetails", async () => {
+				const addressDetailsResult = await addressApi.getAddressDetails(address, validateaddressResult.scriptPubKey, sort, limit, offset);
+				let addressDetails = addressDetailsResult.addressDetails;
+
+				if (addressDetailsResult.errors) {
+					res.locals.addressDetailsErrors = addressDetailsResult.errors;
+				}
+
+				if (addressDetails) {
+					res.locals.addressDetails = addressDetails;
+
+					if (addressDetails.balanceSat == 0) {
+						// make sure zero balances pass the falsey check in the UI
+						addressDetails.balanceSat = "0";
+					}
+
+					if (addressDetails.txCount == 0) {
+						// make sure txCount=0 pass the falsey check in the UI
+						addressDetails.txCount = "0";
+					}
+
+					if (addressDetails.txids) {
+						let txids = addressDetails.txids;
+
+						// if the active addressApi gives us blockHeightsByTxid, it saves us work, so try to use it
+						let blockHeightsByTxid = {};
+						if (addressDetails.blockHeightsByTxid) {
+							blockHeightsByTxid = addressDetails.blockHeightsByTxid;
+						}
+
+						res.locals.txids = txids;
+
+						const rawTxResult = await (global.txindexAvailable
+							? coreApi.getRawTransactionsWithInputs(txids, 5)
+							: coreApi.getRawTransactionsByHeights(txids, blockHeightsByTxid)
+								.then(transactions => ({ transactions, txInputsByTransaction: {} }))
+						);
+						
+						res.locals.transactions = rawTxResult.transactions;
+						res.locals.txInputsByTransaction = rawTxResult.txInputsByTransaction;
+
+						
+						// for coinbase txs, we need the block height in order to calculate subsidy to display
+						let coinbaseTxs = [];
+						for (let i = 0; i < rawTxResult.transactions.length; i++) {
+							let tx = rawTxResult.transactions[i];
+
+							for (let j = 0; j < tx.vin.length; j++) {
+								if (tx.vin[j].coinbase) {
+									// addressApi sometimes has blockHeightByTxid already available, otherwise we need to query for it
+									if (!blockHeightsByTxid[tx.txid]) {
+										coinbaseTxs.push(tx);
+									}
+								}
+							}
+						}
+
+
+						let coinbaseTxBlockHashes = [];
+						let blockHashesByTxid = {};
+						coinbaseTxs.forEach(function(tx) {
+							coinbaseTxBlockHashes.push(tx.blockhash);
+							blockHashesByTxid[tx.txid] = tx.blockhash;
+						});
+
+						let blockHeightsPromises = [];
+						if (coinbaseTxs.length > 0) {
+							// we need to query some blockHeights by hash for some coinbase txs
+							blockHeightsPromises.push(utils.timePromise("address.getBlocksByHash", async () => {
+								const blocksByHashResult = await coreApi.getBlocksByHash(coinbaseTxBlockHashes);
+								for (let txid in blockHashesByTxid) {
+									if (blockHashesByTxid.hasOwnProperty(txid)) {
+										blockHeightsByTxid[txid] = blocksByHashResult[blockHashesByTxid[txid]].height;
+									}
+								}
+							}, perfResults));
+						}
+
+						await utils.awaitPromises(blockHeightsPromises);
+
+						let addrGainsByTx = {};
+						let addrLossesByTx = {};
+
+						res.locals.addrGainsByTx = addrGainsByTx;
+						res.locals.addrLossesByTx = addrLossesByTx;
+
+						let handledTxids = [];
+
+						for (let i = 0; i < rawTxResult.transactions.length; i++) {
+							let tx = rawTxResult.transactions[i];
+							let txInputs = rawTxResult.txInputsByTransaction[tx.txid] || {};
+							
+							if (handledTxids.includes(tx.txid)) {
+								continue;
+							}
+
+							handledTxids.push(tx.txid);
+
+							for (let j = 0; j < tx.vout.length; j++) {
+								if (tx.vout[j].value > 0 && tx.vout[j].scriptPubKey) {
+									if (utils.getVoutAddresses(tx.vout[j]).includes(address)) {
+										if (addrGainsByTx[tx.txid] == null) {
+											addrGainsByTx[tx.txid] = new Decimal(0);
+										}
+
+										addrGainsByTx[tx.txid] = addrGainsByTx[tx.txid].plus(new Decimal(tx.vout[j].value));
+									}
+								}
+							}
+
+							for (let j = 0; j < tx.vin.length; j++) {
+								let txInput = txInputs[j];
+								let vinJ = tx.vin[j];
+
+								if (txInput != null) {
+									if (txInput && txInput.scriptPubKey) {
+										if (utils.getVoutAddresses(txInput).includes(address)) {
+											if (addrLossesByTx[tx.txid] == null) {
+												addrLossesByTx[tx.txid] = new Decimal(0);
+											}
+
+											addrLossesByTx[tx.txid] = addrLossesByTx[tx.txid].plus(new Decimal(txInput.value));
+										}
+									}
+								}
+							}
+
+							//debugLog("tx: " + JSON.stringify(tx));
+							//debugLog("txInputs: " + JSON.stringify(txInputs));
+						}
+
+						res.locals.blockHeightsByTxid = blockHeightsByTxid;
+					}
+				}
+			}, perfResults));
+
+			promises.push(utils.timePromise("address.getBlockchainInfo", async () => {
+				res.locals.getblockchaininfo = await coreApi.getBlockchainInfo();
+			}, perfResults));
+		}
+
+		promises.push(utils.timePromise("address.qrcode.toDataURL", async () => {
+			try {
+				const url = await qrcode.toDataURL(address);
+
+				res.locals.addressQrCodeUrl = url;
+				
+			} catch(err) {
+				res.locals.pageErrors.push(utils.logError("93ygfew0ygf2gf2", err));
+			}
+		}, perfResults));
+
+		await utils.awaitPromises(promises);
+		
+		await utils.timePromise("address.render", async () => {
+			res.render("address");
+		}, perfResults);
+
+		next();
+
+	} catch (e) {
+		res.locals.pageErrors.push(utils.logError("2108hs0gsdfe", e, {address:address}));
+
+		res.locals.userMessageMarkdown = `Failed to load address: **${address}**`;
+
+		await utils.timePromise("address.render", async () => {
+			res.render("address");
 		});
 
 		next();

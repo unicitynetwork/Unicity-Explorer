@@ -438,7 +438,7 @@ function getRpcData(cmd, verifyingConnection=false) {
 	}
 
 	return new Promise(function(resolve, reject) {
-		debugLog(`RPC: ${cmd}`);
+		//debugLog(`RPC: ${cmd}`);
 
 		let rpcCall = async function(callback) {
 			let client = (cmd == "gettxoutsetinfo" ? global.rpcClientNoTimeout : global.rpcClient);
@@ -500,7 +500,7 @@ function getRpcDataWithParams(request, verifyingConnection=false) {
 	}
 
 	return new Promise(function(resolve, reject) {
-		debugLog(`RPC: ${JSON.stringify(request)}`);
+		//debugLog(`RPC: ${JSON.stringify(request)}`);
 
 		let rpcCall = async function(callback) {
 			let client = (request.method == "gettxoutsetinfo" ? global.rpcClientNoTimeout : global.rpcClient);
@@ -611,6 +611,7 @@ module.exports = {
 	getUptimeSeconds: getUptimeSeconds,
 	getHelp: getHelp,
 	getRpcMethodHelp: getRpcMethodHelp,
+	getAddress: getAddress,
 	getPeerInfo: getPeerInfo,
 	getChainTxStats: getChainTxStats,
 	getSmartFeeEstimate: getSmartFeeEstimate,

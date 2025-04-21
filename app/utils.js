@@ -1406,6 +1406,147 @@ function nextHalvingEstimates(eraStartBlockHeader, currentBlockHeader, difficult
 }
 
 
+function tryParseAddress(address) {
+	let base58Error = null;
+	let bech32Error = null;
+	let bech32mError = null;
+
+	let parsedAddress = null;
+
+	let b58prefix = (global.activeBlockchain == "main" ? /^[13].*$/ : /^[2mn].*$/);
+	if (address.match(b58prefix)) {
+		try {
+			parsedAddress = bitcoinjs.address.fromBase58Check(address);
+			parsedAddress.hash = parsedAddress.hash.toString("hex");
+
+			return {
+				encoding: "base58",
+				parsedAddress: parsedAddress
+			};
+
+		} catch (err) {
+			base58Error = err;
+		}
+	}
+
+
+	try {
+		parsedAddress = bitcoinjs.address.fromBech32(address);
+		parsedAddress.data = parsedAddress.data.toString("hex");
+
+		return {
+			encoding: "bech32",
+			parsedAddress: parsedAddress
+		};
+
+	} catch (err) {
+		bech32Error = err;
+	}
+
+
+	// Check for Bech32m addresses
+	try {
+		parsedAddress = bech32m.decode(address);
+		parsedAddress.words = Buffer.from(parsedAddress.words).toString("hex");
+
+		return {
+			encoding: "bech32m",
+			parsedAddress: parsedAddress
+		};
+
+	} catch (err) {
+		bech32mError = err;
+	}
+	
+	// If none of the above formats match, return errors
+	let returnVal = {errors:[]};
+
+	if (base58Error) {
+		returnVal.errors.push(base58Error);
+	}
+
+	if (bech32Error) {
+		returnVal.errors.push(bech32Error);
+	}
+
+	if (bech32mError) {
+		returnVal.errors.push(bech32mError);
+	}
+
+	return returnVal;
+}
+
+
+
+
+function tryParseAddressOld(address) {
+	let base58Error = null;
+	let bech32Error = null;
+	let bech32mError = null;
+
+	let parsedAddress = null;
+
+	let b58prefix = (global.activeBlockchain == "main" ? /^[13].*$/ : /^[2mn].*$/);
+	if (address.match(b58prefix)) {
+		try {
+			parsedAddress = bitcoinjs.address.fromBase58Check(address);
+			parsedAddress.hash = parsedAddress.hash.toString("hex");
+
+			return {
+				encoding: "base58",
+				parsedAddress: parsedAddress
+			};
+
+		} catch (err) {
+			base58Error = err;
+		}
+	}
+
+	try {
+		parsedAddress = bitcoinjs.address.fromBech32(address);
+		parsedAddress.data = parsedAddress.data.toString("hex");
+
+		return {
+			encoding: "bech32",
+			parsedAddress: parsedAddress
+		};
+
+	} catch (err) {
+		bech32Error = err;
+	}
+
+
+	try {
+		parsedAddress = bech32m.decode(address);
+		parsedAddress.words = Buffer.from(parsedAddress.words).toString("hex");
+
+		return {
+			encoding: "bech32m",
+			parsedAddress: parsedAddress
+		};
+
+	} catch (err) {
+		bech32mError = err;
+	}
+	
+
+	let returnVal = {errors:[]};
+
+	if (base58Error) {
+		returnVal.errors.push(base58Error);
+	}
+
+	if (bech32Error) {
+		returnVal.errors.push(bech32Error);
+	}
+
+	if (bech32mError) {
+		returnVal.errors.push(bech32mError);
+	}
+
+	return returnVal;
+}
+
 
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -1516,6 +1657,7 @@ module.exports = {
 	getVoutAddresses: getVoutAddresses,
 	difficultyAdjustmentEstimates: difficultyAdjustmentEstimates,
 	nextHalvingEstimates: nextHalvingEstimates,
+	tryParseAddress: tryParseAddress,
 	sleep: sleep,
 	obfuscateProperties: obfuscateProperties,
 	awaitPromises: awaitPromises,

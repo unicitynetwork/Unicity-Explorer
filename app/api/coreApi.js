@@ -113,7 +113,8 @@ if (redisCache.active) {
 	const onRedisCacheEvent = function(cacheType, eventType, cacheKey) {
 		global.cacheStats.redis[eventType]++;
 		statTracker.trackEvent(`caches.redis.${eventType}`);
-		debugLog(`cache.${cacheType}.${eventType}: ${cacheKey}`);
+		// Commented out to reduce excessive debug logging
+		// debugLog(`cache.${cacheType}.${eventType}: ${cacheKey}`);
 	}
 
 	// md5 of the active RPC credentials serves as part of the key; this enables

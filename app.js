@@ -27,7 +27,7 @@ configPaths.forEach(path => {
 });
 
 if (!configFileLoaded) {
-    console.log("No config files found. Using all defaults.");
+    debugErrorLog("No config files found. Using all defaults.");
     if (!process.env.NODE_ENV) {
         process.env.NODE_ENV = "production";
     }
@@ -40,11 +40,6 @@ debug.enable(process.env.DEBUG || debugDefaultCategories);
 const debugLog = debug("btcexp:app");
 const debugErrorLog = debug("btcexp:error");
 const debugAccessLog = debug("btcexp:access");
-
-
-
-
-
 
 global.cacheStats = {};
 
@@ -67,6 +62,8 @@ const coreApi = require("./app/api/coreApi.js");
 const rpcApi = require("./app/api/rpcApi.js");
 const coins = require("./app/coins.js");
 const axios = require("axios");
+const addressApi = require("./app/api/addressApi.js");
+const electrumAddressApi = require("./app/api/electrumAddressApi.js");
 const qrcode = require("qrcode");
 const appStats = require("./app/appStats.js");
 const auth = require('./app/auth.js');
@@ -721,6 +718,33 @@ expressApp.continueStartup = function() {
 	// note: see verifyRpcConnection() for associated clearInterval() after success
 	verifyRpcConnection();
 	global.verifyRpcConnectionIntervalId = setInterval(verifyRpcConnection, 30000);
+
+
+	if (config.addressApi) {
+			
+			
+			let supportedAddressApis = addressApi.getSupportedAddressApis();
+			if (!supportedAddressApis.includes(config.addressApi)) {
+				debugErrorLog(`ERROR: Unrecognized addressApi value: ${config.addressApi}`);
+				utils.logError("32907ghsd0ge", `Unrecognized value for BTCEXP_ADDRESS_API: '${config.addressApi}'. Valid options are: ${supportedAddressApis}`);
+			}
+	
+			if (config.addressApi == "electrum") {
+				if (config.electrumServers && config.electrumServers.length > 0) {
+
+					electrumAddressApi.connectToServers().then(function() {
+						debugLog(`Electrum servers: ${JSON.stringify(config.electrumServers)}`);
+						global.electrumAddressApi = electrumAddressApi;
+						
+					}).catch(function(err) {
+						utils.logError("31207ugf4e0fed", err, {electrumServers:config.electrumServers});
+					});
+				} else {
+					debugErrorLog("ERROR: No Electrum servers configured");
+					utils.logError("327hs0gde", "You must set the 'BTCEXP_ELECTRUM_SERVERS' environment variable when BTCEXP_ADDRESS_API=electrum.");
+				}
+			}
+		}
 
 
 
