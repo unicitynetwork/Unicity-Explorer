@@ -66,6 +66,16 @@ function connectToServer(host, port, protocol) {
 		var electrumConfig = { client:"btc-rpc-explorer-v2", version:"1.4" };
 		var electrumPersistencePolicy = { retryPeriod: 10000, maxRetry: 1000, callback: null };
 
+		// TLS options to skip certificate verification for local Docker containers
+		var tlsOptions = null;
+		if (actualProtocol === 'tls' && (host === 'fulcrum-alpha' || host.includes('fulcrum') || host === 'localhost' || host === '127.0.0.1')) {
+			tlsOptions = {
+				rejectUnauthorized: false,
+				checkServerIdentity: () => undefined
+			};
+			debugLog(`Using relaxed TLS verification for local Electrum server @ ${host}`);
+		}
+
 		debugLog(`Electrum config: ${JSON.stringify(electrumConfig)}`);
 		debugLog(`Electrum persistence policy: ${JSON.stringify(electrumPersistencePolicy)}`);
 
@@ -131,7 +141,7 @@ function connectToServer(host, port, protocol) {
 			onLog: onLog
 		};
 
-		var electrumClient = new ElectrumClient(port, host, protocol || defaultProtocol, null, electrumCallbacks);
+		var electrumClient = new ElectrumClient(port, host, protocol || defaultProtocol, tlsOptions, electrumCallbacks);
 		
 		electrumClient.initElectrum(electrumConfig, electrumPersistencePolicy).then(function() {
 			// success handled by onConnect callback

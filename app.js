@@ -14,6 +14,14 @@ const configPaths = [
     path.join(process.cwd(), ".env"),
 ];
 
+// Setup debug early
+const debugDefaultCategories = "btcexp:app,btcexp:error,btcexp:errorVerbose";
+debug.enable(process.env.DEBUG || debugDefaultCategories);
+
+const debugLog = debug("btcexp:app");
+const debugErrorLog = debug("btcexp:error");
+const debugAccessLog = debug("btcexp:access");
+
 let configFileLoaded = false;
 configPaths.forEach(path => {
     if (fs.existsSync(path)) {
@@ -21,6 +29,8 @@ configPaths.forEach(path => {
         const config = dotenv.parse(fs.readFileSync(path));
         if (config.DEBUG) {
             process.env.DEBUG = config.DEBUG;
+            // Re-enable with new DEBUG setting
+            debug.enable(process.env.DEBUG);
         }
         configFileLoaded = true;
     }
@@ -32,14 +42,6 @@ if (!configFileLoaded) {
         process.env.NODE_ENV = "production";
     }
 }
-
-// Refresh the DEBUG env var for the `debug` module
-const debugDefaultCategories = "btcexp:app,btcexp:error,btcexp:errorVerbose";
-debug.enable(process.env.DEBUG || debugDefaultCategories);
-
-const debugLog = debug("btcexp:app");
-const debugErrorLog = debug("btcexp:error");
-const debugAccessLog = debug("btcexp:access");
 
 global.cacheStats = {};
 

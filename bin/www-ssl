@@ -1,0 +1,90 @@
+#!/usr/bin/env node
+
+"use strict";
+
+const debug = require('debug')('btcexp:www');
+const app = require('../app');
+const fs = require('fs');
+const path = require('path');
+const http = require('http');
+const https = require('https');
+
+const v8 = require('v8');
+const maxOldSpaceSize = parseInt(process.env.BTCEXP_OLD_SPACE_MAX_SIZE, 10) || 1024;
+v8.setFlagsFromString(`--max_old_space_size=${maxOldSpaceSize}`);
+debug(`Set max_old_space_size to ${maxOldSpaceSize} MB`);
+
+const port = process.env.PORT || process.env.BTCEXP_PORT || 3002;
+const sslPort = process.env.SSL_PORT || 443;
+const host = process.env.BTCEXP_HOST || '0.0.0.0';
+
+app.set('port', port);
+app.set('host', host);
+
+// Check for SSL certificates
+const sslCertPath = process.env.SSL_CERT_PATH || '/etc/nginx/ssl';
+const certFile = path.join(sslCertPath, 'fullchain.pem');
+const keyFile = path.join(sslCertPath, 'privkey.pem');
+
+let useSSL = false;
+let sslOptions = {};
+
+if (fs.existsSync(certFile) && fs.existsSync(keyFile)) {
+    try {
+        sslOptions = {
+            cert: fs.readFileSync(certFile),
+            key: fs.readFileSync(keyFile)
+        };
+        useSSL = true;
+        console.log('SSL certificates found, enabling HTTPS');
+    } catch (err) {
+        console.error('Error reading SSL certificates:', err);
+    }
+} else {
+    console.log('No SSL certificates found, running HTTP only');
+}
+
+// Always start HTTP server (for redirect if SSL is enabled)
+const httpServer = http.createServer(app);
+
+if (useSSL) {
+    // Create redirect app for HTTP -> HTTPS
+    const redirectApp = require('express')();
+    redirectApp.get('*', (req, res) => {
+        const httpsUrl = `https://${req.headers.host}${req.url}`;
+        res.redirect(301, httpsUrl);
+    });
+    
+    // HTTP server redirects to HTTPS
+    const httpRedirectServer = http.createServer(redirectApp);
+    httpRedirectServer.listen(80, host, () => {
+        console.log(`HTTP redirect server listening on ${host}:80`);
+    });
+    
+    // HTTPS server handles the actual app
+    const httpsServer = https.createServer(sslOptions, app);
+    httpsServer.listen(sslPort, host, () => {
+        console.log(`HTTPS server listening on ${host}:${sslPort}`);
+        
+        if (app.onStartup) {
+            (async function() {
+                await app.onStartup();
+            })();
+        }
+        
+        debug('Express HTTPS server startup complete.');
+    });
+} else {
+    // HTTP only
+    httpServer.listen(port, host, () => {
+        console.log(`HTTP server listening on ${host}:${port}`);
+        
+        if (app.onStartup) {
+            (async function() {
+                await app.onStartup();
+            })();
+        }
+        
+        debug('Express HTTP server startup complete.');
+    });
+}

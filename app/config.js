@@ -45,19 +45,19 @@ const cookieSecret = process.env.BTCEXP_COOKIE_SECRET
  
 
 
-// const electrumServerUriStrings = (process.env.BTCEXP_ELECTRUM_SERVERS || process.env.BTCEXP_ELECTRUMX_SERVERS || "").split(',').filter(Boolean);
-// const electrumServers = [];
-// for (let i = 0; i < electrumServerUriStrings.length; i++) {
-//   const uri = url.parse(electrumServerUriStrings[i]);
-//   
-//   electrumServers.push({protocol:uri.protocol.substring(0, uri.protocol.length - 1), host:uri.hostname, port:parseInt(uri.port)});
-// }
+const electrumServerUriStrings = (process.env.BTCEXP_ELECTRUM_SERVERS || process.env.BTCEXP_ELECTRUMX_SERVERS || "").split(',').filter(Boolean);
+const electrumServers = [];
+for (let i = 0; i < electrumServerUriStrings.length; i++) {
+  const uri = url.parse(electrumServerUriStrings[i]);
+  
+  electrumServers.push({protocol:uri.protocol.substring(0, uri.protocol.length - 1), host:uri.hostname, port:parseInt(uri.port)});
+}
 
-// Configure static local Electrum server
-const electrumServers = [
-  // Standard TCP connection
-  { protocol: 'tcp', host: '127.0.0.1', port: 50001 }
-];
+// Fallback to localhost if no servers configured
+if (electrumServers.length === 0 && process.env.BTCEXP_ADDRESS_API === "electrum") {
+  console.log("Warning: BTCEXP_ADDRESS_API is set to 'electrum' but no BTCEXP_ELECTRUM_SERVERS configured. Using localhost:50001 as fallback.");
+  electrumServers.push({ protocol: 'tcp', host: '127.0.0.1', port: 50001 });
+}
 
 // default=false env vars
 [
