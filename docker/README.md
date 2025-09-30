@@ -1,12 +1,23 @@
-# Unicity Explorer Docker Scripts
+# Unicity Explorer Docker Support
 
-This directory contains Docker build and deployment scripts for the Unicity Explorer.
+This directory contains Docker infrastructure for building and running the Unicity Explorer with automatic SSL/TLS support.
 
-## Prerequisites
+## Quick Start
 
-- Docker installed and running
-- Docker Compose installed
-- For SSL: Let's Encrypt certificates installed on the host
+```bash
+# Build the Docker image
+./build.sh
+
+# Run the explorer
+./run-explorer.sh
+```
+
+## Features
+
+- **Automatic SSL Detection**: Automatically detects and uses Let's Encrypt certificates
+- **Network Auto-Discovery**: Automatically joins `alpha-net` Docker network if available
+- **Built-in SSL Support**: Node.js native SSL/TLS support without nginx
+- **Default Credentials**: Pre-configured with standard alpha-node credentials (user/password)
 
 ## Scripts
 
@@ -15,191 +26,112 @@ Builds the Unicity Explorer Docker image locally.
 ```bash
 ./build.sh
 ```
+Creates image: `unicity-explorer:latest`
 
 ### publish-image.sh
-Builds and publishes the Docker image to a registry (default: GitHub Container Registry).
+Builds and publishes the Docker image to GitHub Container Registry.
 ```bash
-./publish-image.sh [tag]
-```
+# Publish with default 'latest' tag
+./publish-image.sh
 
-### run-explorer-auto-ssl.sh
-Automatically detects available SSL certificates and runs the explorer with HTTPS support.
-- Searches for Let's Encrypt certificates in `/etc/letsencrypt/live/`
-- Allows selection if multiple certificates are found
-- Falls back to HTTP-only mode if no certificates are available
-```bash
-./run-explorer-auto-ssl.sh
-```
+# Publish with specific tag
+./publish-image.sh v1.0.0
 
-### run-explorer-ssl.sh
-Runs the explorer with SSL using a specific domain certificate (configured in the script).
-Default domain: `friendly-miners.dyndns.org`
+# Publish with multiple tags
+./publish-image.sh v1.0.0 "latest,stable"
+```
+Publishes to: `ghcr.io/unicitynetwork/unicity-explorer`
+
+### run-explorer.sh
+Runs the explorer with automatic configuration detection:
+- Detects and joins `alpha-net` network if available
+- Prompts for Fulcrum/Electrum server selection
+- Automatically detects SSL certificates
+- Configures ports based on SSL availability
+
 ```bash
-./run-explorer-ssl.sh
+./run-explorer.sh
 ```
 
 ## Configuration
 
-The Docker scripts automatically create configuration files with sensible defaults:
+### Network Modes
+- **alpha-net**: Automatically detected if available, uses container names for connectivity
+- **host**: Fallback mode when alpha-net is not available
 
 ### Default Connections
-- **Alpha Node**: `localhost:8589` (when using host network)
-- **Fulcrum Server**: `tcp://localhost:50001` (local Fulcrum without SSL)
+- **Alpha Node**: 
+  - Host: `alpha-node` (in alpha-net) or `localhost` (host network)
+  - Port: `8589`
+  - Credentials: `user:password`
+- **Fulcrum/Electrum**:
+  - Options presented during startup:
+    - Local Fulcrum: `tcp://localhost:50001` or `tcp://fulcrum-alpha:50001`
+    - Public Fulcrum: `tls://fulcrum.unicity.network:50002`
+    - Custom endpoint
+    - Skip (no address indexing)
 
-### Configuration Templates
+### SSL/TLS Configuration
+When SSL certificates are detected:
+- HTTP on port 80 (redirects to HTTPS)
+- HTTPS on port 443
 
-Three configuration templates are provided:
+Without SSL certificates:
+- HTTP only on port 3002
 
-1. **`.env.template`** - Default configuration for standalone deployment
-   - Connects to local Alpha node at localhost:8589
-   - Uses local Fulcrum server at localhost:50001 (default)
-   - Alternative options available: public Fulcrum or custom endpoint
-
-2. **`.env.alpha-net`** - Configuration for running with Fulcrum/Alpha Docker containers
-   - Connects to `alpha-node` container
-   - Connects to `fulcrum-alpha` container
-
-### Manual Configuration
-
-1. Create a `config` directory (created automatically by scripts):
+### Environment Variables
+You can override defaults with environment variables:
 ```bash
-mkdir config
+BTCEXP_BITCOIND_HOST=alpha-node \
+BTCEXP_BITCOIND_PORT=8589 \
+BTCEXP_BITCOIND_USER=user \
+BTCEXP_BITCOIND_PASS=password \
+BTCEXP_ELECTRUM_SERVERS=tcp://fulcrum-alpha:50001 \
+./run-explorer.sh
 ```
 
-2. Copy and edit the appropriate template:
+## Docker Image
+
+The Docker image includes:
+- Node.js 18 Alpine base
+- Built-in SSL/TLS support via `bin/www-ssl`
+- Health check endpoint at `/api/status`
+- Automatic environment configuration
+
+## Container Management
+
 ```bash
-# For standalone deployment
-cp config/.env.template config/.env
-
-# For alpha-net deployment
-cp config/.env.alpha-net config/.env
-
-# Edit config/.env with your settings
-```
-
-### Required Configuration
-- `BTCEXP_COIN=ALPHA` - Set to ALPHA for Unicity network
-- `BTCEXP_BITCOIND_PORT=8589` - RPC port for Unicity node
-- `BTCEXP_BITCOIND_HOST` - Host where Unicity node is running
-- `BTCEXP_BITCOIND_USER` - RPC username (if configured)
-- `BTCEXP_BITCOIND_PASS` - RPC password (if configured)
-
-### Fulcrum/Electrum Configuration
-
-The run scripts provide interactive Fulcrum endpoint selection:
-
-1. **Automatic Selection** - When first running the scripts, you'll be prompted to choose:
-   - Option 1: `tcp://localhost:50001` (local Fulcrum, no SSL) - **Default**
-   - Option 2: `tls://fulcrum.unicity.network:50002` (public Fulcrum, SSL)
-   - Option 3: Custom endpoint (enter any tcp:// or tls:// URL)
-   - Option 4: Skip (no address indexing)
-
-2. **Manual Configuration** - Edit `.env` file:
-   - `BTCEXP_ADDRESS_API=electrum` - Enable address indexing
-   - `BTCEXP_ELECTRUM_SERVERS` - Fulcrum server URL
-     - Local: `tcp://localhost:50001` (default)
-     - Public: `tls://fulcrum.unicity.network:50002` (with SSL)
-     - Docker: `tcp://fulcrum-alpha:50001` (in alpha-net)
-     - Custom: `tcp://192.168.1.100:50001` (any IP:port)
-
-3. **Environment Variable** - Override via environment:
-   ```bash
-   export BTCEXP_ELECTRUM_SERVERS=tcp://192.168.1.100:50001
-   ./run-explorer-auto-ssl.sh
-   ```
-
-## Running with Docker Compose
-
-### Standalone with Host Network (HTTP only)
-Uses host network to connect to local Alpha node and Fulcrum:
-```bash
-docker compose -f docker compose.standalone.yml up -d
-```
-
-### With Fulcrum/Alpha Docker Stack
-If running Fulcrum and Alpha node in Docker using alpha-net network:
-```bash
-# Ensure alpha-net network exists (created by Fulcrum's docker compose)
-docker compose -f docker compose.alpha-net.yml up -d
-```
-
-### With SSL (using run scripts)
-The SSL run scripts automatically create a docker compose.yml with nginx proxy for HTTPS.
-
-### Network Modes
-You can control the network mode using the `EXPLORER_NETWORK` environment variable:
-```bash
-# Use host network (default)
-./run-explorer-auto-ssl.sh
-
-# Use alpha-net network
-EXPLORER_NETWORK=alpha-net ./run-explorer-auto-ssl.sh
-
-# Use custom network
-EXPLORER_NETWORK=my-network ./run-explorer-auto-ssl.sh
-```
-
-## Directory Structure
-```
-docker/
-├── build.sh                      # Build script
-├── publish-image.sh              # Publish to registry
-├── run-explorer-auto-ssl.sh      # Auto-detect SSL certificates
-├── run-explorer-ssl.sh           # Use specific SSL certificate
-├── Dockerfile                    # Multi-stage Docker build
-├── docker compose.standalone.yml # Simple HTTP-only compose
-├── config/                       # Configuration files (created)
-│   └── .env                      # Environment configuration
-├── ssl/                          # SSL certificates (created)
-│   ├── fullchain.pem
-│   └── privkey.pem
-└── nginx/                        # Nginx config (created)
-    └── default.conf
-```
-
-## SSL Certificate Management
-
-The SSL scripts automatically:
-1. Find Let's Encrypt certificates on the host
-2. Copy them to a local `ssl/` directory
-3. Configure nginx as an HTTPS proxy
-4. Set up automatic HTTP to HTTPS redirect
-
-## Accessing the Explorer
-
-- **HTTP**: http://localhost:3002 (standalone)
-- **HTTPS**: https://your-domain.com (with SSL scripts)
-
-## Monitoring
-
-View logs:
-```bash
-# Explorer logs
+# View logs
 docker logs -f unicity-explorer
 
-# Nginx logs (when using SSL)
-docker logs -f unicity-explorer-nginx
-```
-
-Check status:
-```bash
-docker ps
-```
-
-## Stopping the Services
-
-```bash
-# If using docker compose
-docker compose down
-
-# Or stop individual containers
+# Stop the container
 docker stop unicity-explorer
-docker stop unicity-explorer-nginx
+
+# Start the container
+docker start unicity-explorer
+
+# Remove the container
+docker rm unicity-explorer
 ```
+
+## SSL Certificate Notes
+
+The explorer automatically detects Let's Encrypt certificates in `/etc/letsencrypt/live/`. 
+For local Fulcrum connections with self-signed certificates, the explorer automatically 
+skips certificate verification to allow connectivity within Docker networks.
 
 ## Troubleshooting
 
-1. **Port already in use**: Check if another service is using port 3002 or 443
-2. **SSL certificate not found**: Ensure Let's Encrypt certificates exist in `/etc/letsencrypt/live/`
-3. **Connection refused**: Check if the Unicity node is running and accessible
-4. **Permission denied**: Run SSL scripts with appropriate permissions (may need sudo for certificate access)
+### Connection Issues
+- Ensure alpha-node is running and accessible
+- Check if Fulcrum/Electrum server is running
+- Verify network connectivity between containers
+
+### SSL Issues
+- Ensure Let's Encrypt certificates are properly installed
+- Check certificate permissions (must be readable)
+- Verify certificate paths are correctly mounted
+
+### Port Conflicts
+- Default ports: 80, 443 (with SSL) or 3002 (without SSL)
+- Stop any services using these ports before running the explorer

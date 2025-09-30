@@ -1,146 +1,115 @@
 #!/bin/bash
-
-# Script to build and push the Unicity Explorer Docker image to GitHub Container Registry
-# Usage: ./publish-image.sh [tag]
+# Script to build and publish Unicity Explorer Docker image to GitHub Container Registry
 
 set -e
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
 # Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-IMAGE_NAME="explorer"
-TAG="${1:-latest}"
-DEFAULT_REGISTRY="ghcr.io/unicitynetwork/alpha"
+REGISTRY="ghcr.io"
+NAMESPACE="unicitynetwork"
+REPOSITORY="unicity-explorer"
+DEFAULT_TAG="latest"
 
-# Allow override via environment variable
-REGISTRY="${EXPLORER_REGISTRY:-${DEFAULT_REGISTRY}}"
-FULL_IMAGE_NAME="${REGISTRY}/${IMAGE_NAME}"
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-echo "============================================"
-echo "   Unicity Explorer Docker Image Publisher "
-echo "============================================"
+# Parse arguments
+TAG="${1:-$DEFAULT_TAG}"
+ADDITIONAL_TAGS="${2:-}"
+
+echo -e "${GREEN}Unicity Explorer Docker Image Publisher${NC}"
+echo "=========================================="
 echo ""
-echo "Building and publishing Docker image for Unicity Explorer"
-echo "Image: ${FULL_IMAGE_NAME}:${TAG}"
-echo ""
-
-# Check Docker installation
-if ! command -v docker &>/dev/null; then
-    echo "❌ Error: Docker is not installed"
-    echo "Please install Docker first: https://docs.docker.com/get-docker/"
-    exit 1
-fi
-
-# Check if Docker daemon is running
-if ! docker info >/dev/null 2>&1; then
-    echo "❌ Error: Docker daemon is not running"
-    echo "Please start Docker daemon and try again"
-    exit 1
-fi
 
 # Check if user is logged in to GitHub Container Registry
-if [[ "${FULL_IMAGE_NAME}" == ghcr.io/* ]]; then
-    REGISTRY_URL=$(echo "${FULL_IMAGE_NAME}" | cut -d'/' -f1)
-    if ! docker info 2>/dev/null | grep -q "${REGISTRY_URL}"; then
-        echo "⚠️  You don't appear to be logged in to GitHub Container Registry"
-        echo ""
-        echo "To login, run:"
-        echo "  echo \${GITHUB_PAT} | docker login ghcr.io -u USERNAME --password-stdin"
-        echo ""
-        echo "Your GITHUB_PAT needs 'write:packages' permission."
-        echo ""
-        read -p "Continue anyway? [y/N] " -n 1 -r
-        echo ""
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
+echo "Checking GitHub Container Registry authentication..."
+if ! docker pull ${REGISTRY}/${NAMESPACE}/test:latest &> /dev/null; then
+    echo -e "${YELLOW}Not logged in to GitHub Container Registry${NC}"
+    echo ""
+    echo "Please authenticate using:"
+    echo "  echo \$GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin"
+    echo ""
+    echo "To create a token:"
+    echo "  1. Go to GitHub Settings → Developer settings → Personal access tokens"
+    echo "  2. Create a token with 'write:packages' permission"
+    echo ""
+    read -p "Are you logged in now? (y/n) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${RED}Publishing cancelled${NC}"
+        exit 1
     fi
 fi
 
-# Build arguments
-BUILD_ARGS=""
-if [ -n "${NODE_ENV}" ]; then
-    BUILD_ARGS="--build-arg NODE_ENV=${NODE_ENV}"
-fi
-
-# Build the Docker image
-echo "Building Docker image..."
-echo "Build context: ${PROJECT_ROOT}"
-echo "Dockerfile: ${SCRIPT_DIR}/Dockerfile"
-
-docker build \
-    ${BUILD_ARGS} \
-    -t "${FULL_IMAGE_NAME}:${TAG}" \
-    -f "${SCRIPT_DIR}/Dockerfile" \
-    "${PROJECT_ROOT}"
+# Build the image locally first
+echo -e "${GREEN}Building Docker image...${NC}"
+cd "$PROJECT_ROOT"
+docker build -t ${REPOSITORY}:${TAG} -f docker/Dockerfile .
 
 if [ $? -ne 0 ]; then
-    echo "❌ Build failed!"
+    echo -e "${RED}Build failed!${NC}"
     exit 1
 fi
 
-echo "✅ Build successful!"
+echo -e "${GREEN}Build successful!${NC}"
+echo ""
 
-# Tag as latest if not already
-if [ "${TAG}" != "latest" ]; then
-    echo "Tagging as latest as well..."
-    docker tag "${FULL_IMAGE_NAME}:${TAG}" "${FULL_IMAGE_NAME}:latest"
+# Tag the image for the registry
+FULL_IMAGE_NAME="${REGISTRY}/${NAMESPACE}/${REPOSITORY}"
+echo -e "${GREEN}Tagging image for registry...${NC}"
+docker tag ${REPOSITORY}:${TAG} ${FULL_IMAGE_NAME}:${TAG}
+
+# Add additional tags if specified
+if [ -n "$ADDITIONAL_TAGS" ]; then
+    IFS=',' read -ra TAGS <<< "$ADDITIONAL_TAGS"
+    for t in "${TAGS[@]}"; do
+        echo "  Adding tag: $t"
+        docker tag ${REPOSITORY}:${TAG} ${FULL_IMAGE_NAME}:${t}
+    done
 fi
 
-# Get image size
-IMAGE_SIZE=$(docker images --format "{{.Size}}" "${FULL_IMAGE_NAME}:${TAG}")
+# Push the image
 echo ""
-echo "Image size: ${IMAGE_SIZE}"
+echo -e "${GREEN}Pushing image to registry...${NC}"
+echo "  Registry: ${REGISTRY}"
+echo "  Image: ${FULL_IMAGE_NAME}:${TAG}"
 
-# Ask for confirmation before pushing
-if [[ "${FULL_IMAGE_NAME}" == ghcr.io/* ]] || [[ "${FULL_IMAGE_NAME}" == docker.io/* ]]; then
-    echo ""
-    echo "Ready to push the following tags to registry:"
-    echo "  ${FULL_IMAGE_NAME}:${TAG}"
-    if [ "${TAG}" != "latest" ]; then
-        echo "  ${FULL_IMAGE_NAME}:latest"
-    fi
-    echo ""
-    read -p "Push these images? [y/N] " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "Pushing images to registry..."
-        docker push "${FULL_IMAGE_NAME}:${TAG}"
-        if [ "${TAG}" != "latest" ]; then
-            docker push "${FULL_IMAGE_NAME}:latest"
-        fi
-        echo ""
-        echo "✅ Images pushed successfully!"
-        echo ""
-        echo "Images are now available at:"
-        echo "  ${FULL_IMAGE_NAME}:${TAG}"
-        if [ "${TAG}" != "latest" ]; then
-            echo "  ${FULL_IMAGE_NAME}:latest"
-        fi
-    else
-        echo "Push cancelled. Images are built locally only."
-    fi
-else
-    echo ""
-    echo "✅ Local image built successfully:"
-    echo "  ${FULL_IMAGE_NAME}:${TAG}"
+docker push ${FULL_IMAGE_NAME}:${TAG}
+
+# Push additional tags
+if [ -n "$ADDITIONAL_TAGS" ]; then
+    IFS=',' read -ra TAGS <<< "$ADDITIONAL_TAGS"
+    for t in "${TAGS[@]}"; do
+        echo -e "${GREEN}Pushing tag: ${t}${NC}"
+        docker push ${FULL_IMAGE_NAME}:${t}
+    done
 fi
 
 echo ""
-echo "To run this image with SSL:"
-echo "  cd ${SCRIPT_DIR}"
-echo "  ./run-explorer-auto-ssl.sh"
+echo -e "${GREEN}✅ Successfully published!${NC}"
 echo ""
-echo "To run this image standalone:"
-echo "  docker run -d --name unicity-explorer \\"
-echo "    -p 3002:3002 \\"
-echo "    -v explorer-data:/workspace/data \\"
-echo "    -v ./config/.env:/workspace/.env \\"
-echo "    ${FULL_IMAGE_NAME}:${TAG}"
+echo "Image available at:"
+echo "  ${FULL_IMAGE_NAME}:${TAG}"
+if [ -n "$ADDITIONAL_TAGS" ]; then
+    IFS=',' read -ra TAGS <<< "$ADDITIONAL_TAGS"
+    for t in "${TAGS[@]}"; do
+        echo "  ${FULL_IMAGE_NAME}:${t}"
+    done
+fi
 echo ""
-echo "To run with existing alpha-node container:"
+echo "To pull the image:"
+echo "  docker pull ${FULL_IMAGE_NAME}:${TAG}"
+echo ""
+echo "To run directly:"
 echo "  docker run -d --name unicity-explorer \\"
-echo "    --network container:alpha-node \\"
-echo "    -v explorer-data:/workspace/data \\"
-echo "    -v ./config/.env:/workspace/.env \\"
+echo "    -p 80:80 -p 443:443 \\"
+echo "    -e BTCEXP_BITCOIND_HOST=alpha-node \\"
+echo "    -e BTCEXP_BITCOIND_PORT=8589 \\"
+echo "    -e BTCEXP_BITCOIND_USER=user \\"
+echo "    -e BTCEXP_BITCOIND_PASS=password \\"
 echo "    ${FULL_IMAGE_NAME}:${TAG}"

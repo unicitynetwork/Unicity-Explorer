@@ -7,9 +7,9 @@ set -e
 
 # Configuration
 CONTAINER_NAME="${CONTAINER_NAME:-unicity-explorer}"
-IMAGE_NAME="${EXPLORER_IMAGE:-unicity-explorer-simple:latest}"
+IMAGE_NAME="${EXPLORER_IMAGE:-unicity-explorer:latest}"
 
-echo "Unicity Explorer Simple Runner"
+echo "Unicity Explorer Runner"
 echo "==============================="
 echo ""
 
