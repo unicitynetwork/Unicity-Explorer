@@ -7,10 +7,103 @@ set -e
 
 # Configuration
 CONTAINER_NAME="${CONTAINER_NAME:-unicity-explorer}"
-IMAGE_NAME="${EXPLORER_IMAGE:-unicity-explorer:latest}"
 
 echo "Unicity Explorer Runner"
 echo "==============================="
+echo ""
+
+# Function to format timestamp
+format_date() {
+    local timestamp="$1"
+    if command -v date >/dev/null 2>&1; then
+        date -d "$timestamp" "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "$timestamp"
+    else
+        echo "$timestamp"
+    fi
+}
+
+# Scan for available Docker images
+echo "🔍 Scanning for available Docker images..."
+echo ""
+
+IMAGES=()
+IMAGE_DATES=()
+IMAGE_DISPLAY=()
+
+# Check local image
+if docker image inspect unicity-explorer:latest >/dev/null 2>&1; then
+    CREATED=$(docker image inspect unicity-explorer:latest --format='{{.Created}}')
+    FORMATTED_DATE=$(format_date "$CREATED")
+    IMAGES+=("unicity-explorer:latest")
+    IMAGE_DATES+=("$FORMATTED_DATE")
+    IMAGE_DISPLAY+=("unicity-explorer:latest (local) - Updated: $FORMATTED_DATE")
+fi
+
+# Check GitHub Container Registry image
+# First check if we already have it locally
+if docker image inspect ghcr.io/unicitynetwork/unicity-explorer:latest >/dev/null 2>&1; then
+    CREATED=$(docker image inspect ghcr.io/unicitynetwork/unicity-explorer:latest --format='{{.Created}}')
+    FORMATTED_DATE=$(format_date "$CREATED")
+    IMAGES+=("ghcr.io/unicitynetwork/unicity-explorer:latest")
+    IMAGE_DATES+=("$FORMATTED_DATE")
+    IMAGE_DISPLAY+=("ghcr.io/unicitynetwork/unicity-explorer:latest (registry) - Updated: $FORMATTED_DATE")
+else
+    # Try to pull only metadata to check if it exists
+    echo "Checking remote registry..."
+    if docker manifest inspect ghcr.io/unicitynetwork/unicity-explorer:latest >/dev/null 2>&1; then
+        echo "  Registry image available but not pulled locally"
+        echo "  To use it, first run: docker pull ghcr.io/unicitynetwork/unicity-explorer:latest"
+    elif docker pull ghcr.io/unicitynetwork/unicity-explorer:latest >/dev/null 2>&1; then
+        # Fallback to pull if manifest inspect doesn't work
+        CREATED=$(docker image inspect ghcr.io/unicitynetwork/unicity-explorer:latest --format='{{.Created}}')
+        FORMATTED_DATE=$(format_date "$CREATED")
+        IMAGES+=("ghcr.io/unicitynetwork/unicity-explorer:latest")
+        IMAGE_DATES+=("$FORMATTED_DATE")
+        IMAGE_DISPLAY+=("ghcr.io/unicitynetwork/unicity-explorer:latest (registry) - Updated: $FORMATTED_DATE")
+    else
+        echo "  Note: Registry image not available or requires authentication"
+    fi
+fi
+
+# Display available images
+if [ ${#IMAGES[@]} -eq 0 ]; then
+    echo "❌ No Docker images found!"
+    echo ""
+    echo "Please build the image first with:"
+    echo "  ./docker/build.sh"
+    echo ""
+    echo "Or pull from registry:"
+    echo "  docker pull ghcr.io/unicitynetwork/unicity-explorer:latest"
+    exit 1
+fi
+
+echo ""
+echo "Available Docker images:"
+echo "------------------------"
+for i in "${!IMAGE_DISPLAY[@]}"; do
+    echo "$((i+1)). ${IMAGE_DISPLAY[$i]}"
+done
+echo ""
+
+# Let user select image
+if [ ${#IMAGES[@]} -eq 1 ]; then
+    IMAGE_NAME="${IMAGES[0]}"
+    echo "Using only available image: $IMAGE_NAME"
+else
+    read -p "Select image to run [1-${#IMAGES[@]}] (default: 1): " IMAGE_CHOICE
+    IMAGE_CHOICE=${IMAGE_CHOICE:-1}
+    
+    if [ "$IMAGE_CHOICE" -ge 1 ] && [ "$IMAGE_CHOICE" -le ${#IMAGES[@]} ]; then
+        IMAGE_NAME="${IMAGES[$((IMAGE_CHOICE-1))]}"
+    else
+        IMAGE_NAME="${IMAGES[0]}"
+    fi
+    echo "Selected: $IMAGE_NAME"
+fi
+
+# Override with environment variable if set
+IMAGE_NAME="${EXPLORER_IMAGE:-$IMAGE_NAME}"
+
 echo ""
 
 # Check if alpha-net network exists and use it
