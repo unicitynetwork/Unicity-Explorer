@@ -1,0 +1,154 @@
+extends layout
+
+block headContent
+	title Distribution
+
+block content
+	+pageTitle("Distribution", "Top addresses by balance")
+
+	if (!richList || richList.length == 0)
+		.alert.alert-warning
+			span No distribution data available. The address index may still be building.
+	else
+		.card.shadow-sm.mb-3
+			.card-body
+				.row
+					.col-md-4
+						.text-muted Total Supply
+						.h5= totalSupply ? totalSupply.toLocaleString() + " ALPHA" : "Calculating..."
+					.col-md-4
+						.text-muted Active Addresses
+						.h5= totalAddresses ? totalAddresses.toLocaleString() : "Calculating..."
+					.col-md-4
+						.text-muted Top 100 Control
+						if (richList && richList.length > 0)
+							- var top100Balance = richList.slice(0, 100).reduce((sum, addr) => sum + addr.balance, 0)
+							- var top100Percent = totalSupply ? (top100Balance / totalSupply * 100).toFixed(2) : 0
+							.h5 #{top100Percent}%
+
+		.table-responsive
+			table.table.table-striped.table-hover.table-sm.mb-0
+				thead
+					tr
+						th.text-center(style="width: 50px;") Rank
+						th Address
+						th.text-end Balance
+						th.text-end.d-none.d-md-table-cell % Supply
+						th.text-end.d-none.d-md-table-cell % Unlocked
+						th.text-end.d-none.d-lg-table-cell Tx Count
+						th.text-end.d-none.d-xl-table-cell Last Sent
+
+				tbody
+					each address, index in richList
+						tr
+							td.text-center.fw-bold
+								if (address.rank <= 3)
+									if (address.rank == 1)
+										span.badge.bg-warning.text-dark #1
+									else if (address.rank == 2)
+										span.badge.bg-secondary #2
+									else if (address.rank == 3)
+										span.badge.bg-danger #3
+								else
+									span.text-muted ##{address.rank}
+
+							td
+								a(href=`./address/${address.address}`)
+									span.text-monospace.small
+										span.d-inline.d-md-none= address.address.substring(0, 20) + "..."
+										span.d-none.d-md-inline= address.address
+
+							td.text-end
+								- var balanceStr = address.balance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})
+								span.fw-bold= balanceStr
+								span.text-muted.ms-1 ALPHA
+
+							td.text-end.d-none.d-md-table-cell
+								if (address.percentage >= 1)
+									span.badge.bg-primary= address.percentage.toFixed(2) + "%"
+								else
+									span.text-muted= address.percentage.toFixed(4) + "%"
+
+							td.text-end.d-none.d-md-table-cell
+								if (address.percentUnlocked !== undefined)
+									if (address.percentUnlocked === 100)
+										span.badge.bg-success 100%
+									else if (address.percentUnlocked === 0)
+										span.badge.bg-warning 0%
+									else
+										span.text-muted= address.percentUnlocked.toFixed(1) + "%"
+								else
+									a.text-muted.small(href=`./address-utxos/${address.address}`) Check
+
+							td.text-end.d-none.d-lg-table-cell
+								if (address.txCount)
+									span.text-muted= address.txCount.toLocaleString()
+								else
+									span.text-muted -
+
+							td.text-end.d-none.d-xl-table-cell
+								if (address.lastSent && address.lastSent > 0)
+									- var lastSentDate = new Date(address.lastSent * 1000)
+									- var now = new Date()
+									- var daysAgo = Math.floor((now - lastSentDate) / (1000 * 60 * 60 * 24))
+									if (daysAgo === 0)
+										span.text-muted Today
+									else if (daysAgo === 1)
+										span.text-muted Yesterday
+									else if (daysAgo < 30)
+										span.text-muted #{daysAgo} days ago
+									else if (daysAgo < 365)
+										- var monthsAgo = Math.floor(daysAgo / 30)
+										span.text-muted #{monthsAgo} month#{monthsAgo > 1 ? 's' : ''} ago
+									else
+										- var yearsAgo = Math.floor(daysAgo / 365)
+										span.text-muted #{yearsAgo} year#{yearsAgo > 1 ? 's' : ''} ago
+								else
+									span.text-muted Never
+
+		if (limit && richList && richList.length == limit)
+			nav.mt-3
+				ul.pagination.justify-content-center
+					if (offset > 0)
+						li.page-item
+							a.page-link(href=`${paginationBaseUrl}?limit=${limit}&offset=${Math.max(0, offset - limit)}`) Previous
+
+					- var totalPages = Math.min(10, Math.ceil(500 / limit))
+					- var currentPage = Math.floor(offset / limit) + 1
+					- var startPage = Math.max(1, currentPage - 2)
+					- var endPage = Math.min(totalPages, startPage + 4)
+
+					each pageNum in [...Array(endPage - startPage + 1).keys()].map(i => i + startPage)
+						li.page-item(class=(pageNum == currentPage ? "active" : ""))
+							a.page-link(href=`${paginationBaseUrl}?limit=${limit}&offset=${(pageNum - 1) * limit}`)= pageNum
+
+					if (offset + limit < 500)
+						li.page-item
+							a.page-link(href=`${paginationBaseUrl}?limit=${limit}&offset=${offset + limit}`) Next
+
+	if (generatedAt || blockHeight)
+		.card.shadow-sm.mt-3
+			.card-body
+				h6.card-title Data Info
+				.row
+					.col-md-4
+						.text-muted Block Height
+						.fw-bold= blockHeight ? blockHeight.toLocaleString() : "N/A"
+					.col-md-4
+						.text-muted Last Updated
+						if (generatedAt)
+							- var updateTime = new Date(generatedAt * 1000)
+							.fw-bold= updateTime.toLocaleString()
+						else
+							.fw-bold N/A
+					.col-md-4
+						.text-muted Data Age
+						if (generatedAt)
+							- var ageMinutes = Math.floor((Date.now() - generatedAt * 1000) / 60000)
+							if (ageMinutes < 60)
+								.fw-bold #{ageMinutes} minutes ago
+							else
+								- var ageHours = Math.floor(ageMinutes / 60)
+								.fw-bold #{ageHours} hours ago
+						else
+							.fw-bold N/A

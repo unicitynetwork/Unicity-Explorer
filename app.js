@@ -721,21 +721,21 @@ expressApp.continueStartup = function() {
 
 
 	if (config.addressApi) {
-			
-			
+
+
 			let supportedAddressApis = addressApi.getSupportedAddressApis();
 			if (!supportedAddressApis.includes(config.addressApi)) {
 				debugErrorLog(`ERROR: Unrecognized addressApi value: ${config.addressApi}`);
 				utils.logError("32907ghsd0ge", `Unrecognized value for BTCEXP_ADDRESS_API: '${config.addressApi}'. Valid options are: ${supportedAddressApis}`);
 			}
-	
+
 			if (config.addressApi == "electrum") {
 				if (config.electrumServers && config.electrumServers.length > 0) {
 
 					electrumAddressApi.connectToServers().then(function() {
 						debugLog(`Electrum servers: ${JSON.stringify(config.electrumServers)}`);
 						global.electrumAddressApi = electrumAddressApi;
-						
+
 					}).catch(function(err) {
 						utils.logError("31207ugf4e0fed", err, {electrumServers:config.electrumServers});
 					});
@@ -964,11 +964,16 @@ expressApp.use(function(err, req, res, next) {
 		sharedErrorHandler(req, err);
 	}
 
-	res.status(err.status || 500);
+	// In production, only expose safe error details
+	const safeError = {
+		status: err.status || 500
+	};
+	
+	res.status(safeError.status);
 	res.render('error', {
 		message: err.message,
-		error: {},
-		env: expressApp.get('env')
+		error: safeError,
+		env: "production" // Always force production mode for error display
 	});
 });
 

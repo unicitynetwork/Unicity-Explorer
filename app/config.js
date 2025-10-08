@@ -55,8 +55,9 @@ const cookieSecret = process.env.BTCEXP_COOKIE_SECRET
 
 // Configure static local Electrum server
 const electrumServers = [
-  // Standard TCP connection
+  // Standard TCP connection - update this when you have a working Electrum server
   { protocol: 'tcp', host: '127.0.0.1', port: 50001 }
+  // Note: fulcrum.unicity.network:50004 requires WebSocket support which current electrum-client doesn't have
 ];
 
 // default=false env vars
@@ -241,7 +242,7 @@ module.exports = {
 		toolSections: [
 			{name: "Basics", items: [0, 2]},
 			{name: "Mempool", items: []},
-			{name: "Analysis", items: [ 8, 4, 5, 3, 6, 9]},
+			{name: "Analysis", items: [ 8, 4, 5, 3, 6, 9, 10]},
 			{name: "Technical", items: [7]}
 		]
 	},
@@ -262,6 +263,7 @@ credentials: credentials,
 	/* 7 */ 	{name:"API", url:`.${apiDocs.baseUrl}/docs`, desc:"View docs for the public API.", iconClass:"bi-braces-asterisk"},
 	/* 8 */		{name:"UTXO Set", url:"./utxo-set", desc:"View the latest UTXO Set.", iconClass:"bi-list-columns"},
 	/* 9 */		{name:"Next Halving", url:"./next-halving", desc:"Estimated details about the next halving.", iconClass:"bi-square-half"},
+	/* 10 */	{name:"Distribution", url:"./distribution", desc:"View top addresses by balance.", iconClass:"bi-pie-chart"},
 ]
 };
 

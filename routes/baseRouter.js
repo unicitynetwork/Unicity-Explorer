@@ -5,6 +5,8 @@ const debugLog = debug("btcexp:router");
 
 const express = require('express');
 const csrfApi = require('csurf');
+const fs = require('fs');
+const path = require('path');
 const router = express.Router();
 const util = require('util');
 const moment = require('moment');
@@ -27,6 +29,7 @@ const coreApi = require("./../app/api/coreApi.js");
 const rpcApi = require("./../app/api/rpcApi.js");
 
 const addressApi = require('../app/api/addressApi.js');
+const coinbaseCache = require('./../app/coinbaseCache.js');
 
 
 const forceCsrf = csrfApi({ ignoreMethods: [] });
@@ -584,6 +587,207 @@ router.get("/blocks", asyncHandler(async (req, res, next) => {
 
 
 
+router.get("/distribution", asyncHandler(async (req, res, next) => {
+	const limit = parseInt(req.query.limit) || 100;
+	const offset = parseInt(req.query.offset) || 0;
+
+	res.locals.limit = limit;
+	res.locals.offset = offset;
+	res.locals.paginationBaseUrl = `/distribution`;
+
+	// Load rich list from cached file
+	try {
+		const fs = require('fs');
+		const path = require('path');
+		const cacheFile = path.join(__dirname, '../cache/rich-list.json');
+
+		if (fs.existsSync(cacheFile)) {
+			const data = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+			res.locals.richList = data.top_addresses.slice(offset, offset + limit);
+			res.locals.totalSupply = data.total_supply;
+			res.locals.totalAddresses = data.total_addresses_with_balance;
+			res.locals.generatedAt = data.generated_at;
+			res.locals.blockHeight = data.block_height;
+		} else {
+			res.locals.richList = [];
+			res.locals.errorMessage = "Rich list data not available. Please run the rich list generator.";
+		}
+	} catch (err) {
+		utils.logError("rl007", err, "Failed to load rich list");
+		res.locals.richList = [];
+		res.locals.errorMessage = "Error loading rich list data.";
+	}
+
+	res.render("distribution");
+}));
+
+router.get("/address-utxos/:address", asyncHandler(async (req, res, next) => {
+	const address = req.params.address;
+	const LOCK_HEIGHT = 300000; // Coinbase before this height = locked
+	const MAX_UTXOS_TO_DISPLAY = 100; // Limit display for UI performance
+
+	try {
+		console.log(`Processing UTXOs for address: ${address}`);
+
+		// Load coinbase cache
+		coinbaseCache.loadCache();
+		const cacheStats = coinbaseCache.getCacheStats();
+		console.log(`Coinbase cache stats: ${cacheStats.entries} entries, last height: ${cacheStats.lastHeight}`);
+
+		// Helper function to trace UTXO back to coinbase
+		async function traceToCoinbase(txid, vout) {
+			// Try cache first for instant lookup
+			const cached = await coinbaseCache.getCoinbaseOrigin(txid);
+			if (cached) {
+				return {
+					coinbaseTxid: cached.coinbase_txid,
+					coinbaseBlockHeight: cached.coinbase_height,
+					isLocked: cached.is_vested  // Note: cache uses 'is_vested'
+				};
+			}
+			const visited = new Set();
+			let currentTxid = txid;
+			let currentVout = vout;
+
+			while (true) {
+				if (visited.has(currentTxid)) {
+					throw new Error(`Circular reference detected at ${currentTxid}`);
+				}
+				visited.add(currentTxid);
+
+				// Get transaction details
+				const tx = await rpcApi.getRpcDataWithParams({
+					method: 'getrawtransaction',
+					parameters: [currentTxid, true]
+				});
+
+				// Check if this is a coinbase transaction
+				if (tx.vin && tx.vin.length === 1 && tx.vin[0].coinbase) {
+					// Found coinbase! Get the block height
+					if (tx.blockhash) {
+						const block = await rpcApi.getRpcDataWithParams({
+							method: 'getblock',
+							parameters: [tx.blockhash, 1]
+						});
+						return {
+							coinbaseTxid: currentTxid,
+							coinbaseBlockHeight: block.height,
+							coinbaseBlockHash: tx.blockhash,
+							isLocked: block.height < LOCK_HEIGHT
+						};
+					}
+					throw new Error("Coinbase transaction missing blockhash");
+				}
+
+				// Not a coinbase, trace back to parent
+				if (tx.vin && tx.vin.length > 0 && tx.vin[0].txid) {
+					currentTxid = tx.vin[0].txid;
+					currentVout = tx.vin[0].vout;
+				} else {
+					throw new Error(`Unexpected transaction structure for ${currentTxid}`);
+				}
+			}
+		}
+
+		// Get UTXOs for this address using scantxoutset
+		const utxoSet = await rpcApi.getRpcDataWithParams({
+			method: 'scantxoutset',
+			parameters: ["start", [`addr(${address})`]]
+		});
+		console.log(`Found ${utxoSet?.unspents?.length || 0} UTXOs for address`);
+
+		if (!utxoSet || !utxoSet.unspents || utxoSet.unspents.length === 0) {
+			console.log("No UTXOs found, returning empty result");
+			res.locals.address = address;
+			res.locals.utxos = [];
+			res.locals.lockedBalance = 0;
+			res.locals.unlockedBalance = 0;
+			res.locals.totalBalance = 0;
+			res.locals.lockHeight = LOCK_HEIGHT;
+		} else {
+			// With cache, we can process large UTXO sets efficiently
+			let lockedBalance = 0;
+			let unlockedBalance = 0;
+			let unknownBalance = 0;
+			const utxosWithLockStatus = [];
+
+			console.log(`Processing lock status for ${utxoSet.unspents.length} UTXOs`);
+
+			// Process all UTXOs efficiently with cache
+			for (const utxo of utxoSet.unspents) {
+				try {
+					// Trace this UTXO back to its coinbase origin
+					const coinbaseInfo = await traceToCoinbase(utxo.txid, utxo.vout);
+
+					// Only store details for first MAX_UTXOS_TO_DISPLAY
+					if (utxosWithLockStatus.length < MAX_UTXOS_TO_DISPLAY) {
+						const utxoData = {
+							txid: utxo.txid,
+							vout: utxo.vout,
+							amount: utxo.amount,
+							height: utxo.height,
+							coinbaseTxid: coinbaseInfo.coinbaseTxid,
+							coinbaseHeight: coinbaseInfo.coinbaseBlockHeight,
+							isLocked: coinbaseInfo.isLocked
+						};
+						utxosWithLockStatus.push(utxoData);
+					}
+
+					if (coinbaseInfo.isLocked) {
+						lockedBalance += utxo.amount;
+					} else {
+						unlockedBalance += utxo.amount;
+					}
+				} catch (error) {
+					// If tracing fails, add to unknown balance
+					unknownBalance += utxo.amount;
+
+					// Only store error details for first MAX_UTXOS_TO_DISPLAY
+					if (utxosWithLockStatus.length < MAX_UTXOS_TO_DISPLAY) {
+						utils.logError("utxo001", error);
+						utxosWithLockStatus.push({
+							txid: utxo.txid,
+							vout: utxo.vout,
+							amount: utxo.amount,
+							height: utxo.height,
+							coinbaseTxid: null,
+							coinbaseHeight: null,
+							isLocked: null,
+							error: error.message
+						});
+					}
+				}
+			}
+
+			const totalBalance = lockedBalance + unlockedBalance + unknownBalance;
+
+			res.locals.address = address;
+			res.locals.utxos = utxosWithLockStatus;
+			res.locals.lockedBalance = lockedBalance;
+			res.locals.unlockedBalance = unlockedBalance;
+			res.locals.totalBalance = totalBalance;
+			res.locals.unknownBalance = unknownBalance;
+			res.locals.lockHeight = LOCK_HEIGHT;
+			res.locals.totalUtxoCount = utxoSet.unspents.length;
+			res.locals.displayedUtxoCount = utxosWithLockStatus.length;
+		}
+
+		res.render("address-utxos");
+
+	} catch (err) {
+		console.error("UTXO route error:", err);
+		utils.logError("utxo002", err);
+		res.locals.userMessage = "Error loading UTXO data: " + err.message;
+		res.locals.address = address;
+		res.locals.utxos = [];
+		res.locals.lockedBalance = 0;
+		res.locals.unlockedBalance = 0;
+		res.locals.totalBalance = 0;
+		res.locals.lockHeight = 300000;
+		res.render("address-utxos");
+	}
+}));
+
 
 
 router.get("/block-stats", asyncHandler(async (req, res, next) => {
@@ -858,6 +1062,17 @@ router.get("/block/:blockHash", asyncHandler(async (req, res, next) => {
 			res.locals.result.getblock = blockWithTransactions.getblock;
 			res.locals.result.transactions = blockWithTransactions.transactions;
 			res.locals.result.txInputsByTransaction = blockWithTransactions.txInputsByTransaction;
+
+			// Update coinbase cache with this block
+			try {
+				await coinbaseCache.updateCacheWithBlock(
+					blockWithTransactions.getblock.height,
+					blockWithTransactions.getblock,
+					rpcApi
+				);
+			} catch (err) {
+				debugLog("Error updating coinbase cache:", err);
+			}
 		}, perfResults));
 
 		promises.push(utils.timePromise("block.getBlockStats", async () => {
