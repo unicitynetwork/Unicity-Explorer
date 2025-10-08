@@ -1,0 +1,65 @@
+extends layout
+
+block content
+	+pageTitle("Rate Limit Exceeded", "Too many requests")
+
+	.row.text-center
+		.col
+			+contentSection()
+				.row
+					.col-12.col-lg-8.offset-lg-2
+						.alert.alert-warning.mb-4
+							h4.alert-heading.mb-3
+								i.bi.bi-stopwatch.me-2
+								| Rate Limit Reached
+							
+							p.mb-3
+								| Our system has temporarily limited your access to prevent server overload. This helps ensure a stable experience for all users.
+							
+							hr
+							
+							.text-start
+								h5.mb-3 What you can do:
+								ul.mb-3
+									li Wait 15 minutes before making more requests
+									li Reduce the frequency of your requests
+									li Consider using our API for programmatic access
+									li Check our documentation for rate limit guidelines
+							
+							.text-start
+								h5.mb-3 Current Limits:
+								ul.mb-0
+									li General pages: 100 requests per 15 minutes
+									li Block/transaction details: 20 requests per 15 minutes
+									li API endpoints: Check API documentation
+						
+						+contentSection("Need More Access?")
+							p.mb-2
+								| If you require higher rate limits for legitimate use cases:
+							ul
+								li Contact us for API access with higher limits
+								li Consider running your own Unicity Explorer instance
+								li Contribute to the open-source project
+						
+						+contentSection("Technical Details")
+							.row
+								.col-6
+									.text-muted Retry After:
+									.fw-bold #{retryAfter || "15 minutes"}
+								.col-6
+									.text-muted Your IP:
+									.fw-bold #{clientIp || "N/A"}
+							
+							if (remainingRequests !== undefined)
+								.row.mt-3
+									.col-6
+										.text-muted Requests Used:
+										.fw-bold #{requestsUsed || "N/A"} / #{requestLimit || "N/A"}
+									.col-6
+										.text-muted Window Resets:
+										.fw-bold #{windowReset || "N/A"}
+
+	.text-center.my-4
+		a.btn.btn-primary(href=`${config.baseUrl}/`)
+			i.bi.bi-house-fill.me-2
+			| Return to Homepage
