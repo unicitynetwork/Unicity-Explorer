@@ -1,0 +1,115 @@
+extends layout
+
+block headContent
+	title Address Vesting Analysis
+
+block content
+	+pageTitle("Vesting Analysis", `Vested/Available coin status for ${address}`)
+
+	.card.shadow-sm.mb-3
+		.card-body
+			h6.card-title Balance Summary
+			.row
+				.col-md-3
+					.text-muted Total Balance
+					.h5= totalBalance ? totalBalance.toLocaleString(undefined, {minimumFractionDigits: 8, maximumFractionDigits: 8}) + " ALPHA" : "0 ALPHA"
+				.col-md-3
+					.text-muted.text-success Available Balance
+					.h5.text-success= unlockedBalance ? unlockedBalance.toLocaleString(undefined, {minimumFractionDigits: 8, maximumFractionDigits: 8}) + " ALPHA" : "0 ALPHA"
+				.col-md-3
+					.text-muted.text-warning Vested Balance
+					.h5.text-warning= lockedBalance ? lockedBalance.toLocaleString(undefined, {minimumFractionDigits: 8, maximumFractionDigits: 8}) + " ALPHA" : "0 ALPHA"
+				.col-md-3
+					.text-muted Vesting Until
+					.h5= lockHeight ? "Block " + lockHeight.toLocaleString() : "Block 280,000"
+			if (unknownBalance && unknownBalance > 0)
+				.row.mt-3
+					.col-12
+						.alert.alert-warning.mb-0
+							i.bi.bi-exclamation-triangle.me-2
+							span Unable to determine lock status for #{unknownBalance.toFixed(8)} ALPHA (some UTXOs could not be traced back to their coinbase origin)
+
+	if (!utxos || utxos.length == 0)
+		.alert.alert-info
+			span No UTXOs found for this address.
+	else
+		.card.shadow-sm
+			.card-body
+				if (totalUtxoCount && displayedUtxoCount && totalUtxoCount > displayedUtxoCount)
+					h6.card-title UTXO Details (showing #{displayedUtxoCount} of #{totalUtxoCount.toLocaleString()} total)
+					.alert.alert-info.mb-3
+						i.bi.bi-info-circle.me-2
+						span Showing first #{displayedUtxoCount} UTXOs for details. All #{totalUtxoCount.toLocaleString()} UTXOs have been analyzed for lock status.
+				else
+					h6.card-title UTXO Details (#{utxos.length} total)
+				.table-responsive
+					table.table.table-striped.table-hover.table-sm
+						thead
+							tr
+								th Status
+								th UTXO
+								th Amount
+								th Current Height
+								th Coinbase Origin
+								th Coinbase Height
+						tbody
+							each utxo in utxos
+								tr
+									td
+										if (utxo.isLocked === true)
+											span.badge.bg-warning
+												i.bi.bi-lock-fill.me-1
+												| Vested
+										else if (utxo.isLocked === false)
+											span.badge.bg-success
+												i.bi.bi-unlock-fill.me-1
+												| Available
+										else
+											span.badge.bg-secondary
+												i.bi.bi-question-circle.me-1
+												| Unknown
+
+									td
+										.text-monospace.small
+											a(href=`./tx/${utxo.txid}`)= utxo.txid.substring(0, 10) + "..."
+											span.text-muted :#{utxo.vout}
+
+									td.text-end
+										span.fw-bold= utxo.amount.toFixed(8)
+										span.text-muted.ms-1 ALPHA
+
+									td.text-end
+										if (utxo.height)
+											span.text-muted= utxo.height.toLocaleString()
+										else
+											span.text-muted -
+
+									td
+										if (utxo.coinbaseTxid)
+											.text-monospace.small
+												a(href=`./tx/${utxo.coinbaseTxid}`)= utxo.coinbaseTxid.substring(0, 10) + "..."
+										else if (utxo.error)
+											span.text-danger(title=utxo.error, data-bs-toggle="tooltip") Error
+										else
+											span.text-muted -
+
+									td.text-end
+										if (utxo.coinbaseHeight !== null && utxo.coinbaseHeight !== undefined)
+											if (utxo.coinbaseHeight < lockHeight)
+												span.text-warning.fw-bold= utxo.coinbaseHeight.toLocaleString()
+												span.text-muted.ms-1 (vested)
+											else
+												span.text-success.fw-bold= utxo.coinbaseHeight.toLocaleString()
+												span.text-muted.ms-1 (available)
+										else
+											span.text-muted -
+
+	.card.shadow-sm.mt-3
+		.card-body
+			h6.card-title Vesting Information
+			p.mb-2
+				strong Vesting Schedule:
+				| Coins originating from coinbase transactions mined before block #{lockHeight ? lockHeight.toLocaleString() : "280,000"} are vested (locked).
+			p.mb-0
+				strong Analysis Method:
+				| This analysis traces each UTXO back through its transaction history to find the original coinbase transaction that created the coins and determine its vesting status.

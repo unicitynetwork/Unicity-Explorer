@@ -6,7 +6,7 @@ const config = require('./config.js');
 
 const CACHE_PREFIX = 'coinbase:';
 const LAST_HEIGHT_KEY = 'coinbase:last_height';
-const LOCK_HEIGHT = 300000;
+const LOCK_HEIGHT = 280000;
 
 // Initialize Redis client connection
 async function initRedisClient() {

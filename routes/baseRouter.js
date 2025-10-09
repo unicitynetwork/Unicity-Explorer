@@ -623,7 +623,7 @@ router.get("/distribution", asyncHandler(async (req, res, next) => {
 
 router.get("/address-utxos/:address", asyncHandler(async (req, res, next) => {
 	const address = req.params.address;
-	const LOCK_HEIGHT = 300000; // Coinbase before this height = locked
+	const LOCK_HEIGHT = 280000; // Coinbase before this height = locked
 	const MAX_UTXOS_TO_DISPLAY = 100; // Limit display for UI performance
 
 	try {
@@ -783,7 +783,7 @@ router.get("/address-utxos/:address", asyncHandler(async (req, res, next) => {
 		res.locals.lockedBalance = 0;
 		res.locals.unlockedBalance = 0;
 		res.locals.totalBalance = 0;
-		res.locals.lockHeight = 300000;
+		res.locals.lockHeight = 280000;
 		res.render("address-utxos");
 	}
 }));
