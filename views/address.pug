@@ -78,6 +78,9 @@ block content
 										span(class=(addressDetails.balanceSat > 0 ? "text-success" : false))
 											- var currencyValue = new Decimal(addressDetails.balanceSat).dividedBy(coinConfig.baseCurrencyUnit.multiplier);
 											+valueDisplay(currencyValue)
+										a.btn.btn-sm.btn-outline-primary.ms-2(href=`./address-utxos/${address}`)
+											i.bi.bi-lock.me-1
+											| Vesting Analysis
 
 								if (addressDetails && addressDetails.unconfirmedBalanceSat)
 									+summaryItem("Unconfirmed Balance")
