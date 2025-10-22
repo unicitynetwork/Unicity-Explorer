@@ -68,6 +68,7 @@ const qrcode = require("qrcode");
 const appStats = require("./app/appStats.js");
 const auth = require('./app/auth.js');
 const sso = require('./app/sso.js');
+const coinbaseCache = require('./app/coinbaseCache.js');
 const markdown = require("markdown-it")();
 const v8 = require("v8");
 const compression = require("compression");
@@ -746,7 +747,17 @@ expressApp.continueStartup = function() {
 			}
 		}
 
-
+	// Load coinbase cache into Redis for vesting analysis
+	if (config.redisUrl) {
+		debugLog("Loading coinbase cache into Redis...");
+		coinbaseCache.migrateJsonToRedis().then((count) => {
+			if (count > 0) {
+				debugLog(`Loaded ${count} coinbase origin entries into Redis`);
+			}
+		}).catch((err) => {
+			debugErrorLog(`Error loading coinbase cache: ${err.message}`);
+		});
+	}
 
 	//loadMiningPoolConfigs();
 

@@ -60,8 +60,8 @@ def calculate_unlocked_percentage():
 
     print(f"Loaded {len(coinbase_cache)} cached coinbase origins")
 
-    # Process top addresses (limit to top 100 for performance)
-    addresses = rich_list_data.get("top_addresses", [])[:100]
+    # Process top addresses (limit to top 500 to match distribution page)
+    addresses = rich_list_data.get("top_addresses", [])[:500]
     print(f"Processing top {len(addresses)} addresses...")
 
     for i, addr_data in enumerate(addresses):

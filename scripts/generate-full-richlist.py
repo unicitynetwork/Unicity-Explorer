@@ -163,12 +163,16 @@ def scan_blocks(start_height, end_height, cache):
                 if value > 0:
                     script_pubkey = vout.get('scriptPubKey', {})
 
-                    # Get address
+                    # Get address - handle all output types including P2PK
                     address = None
                     if 'address' in script_pubkey:
                         address = script_pubkey['address']
                     elif 'addresses' in script_pubkey and script_pubkey['addresses']:
                         address = script_pubkey['addresses'][0]
+                    elif 'hex' in script_pubkey:
+                        # For outputs without a standard address (P2PK, non-standard scripts),
+                        # use the scriptPubKey hex as a unique identifier
+                        address = f"script:{script_pubkey['hex']}"
 
                     if address:
                         # Update balance

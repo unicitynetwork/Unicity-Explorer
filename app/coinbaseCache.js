@@ -8,21 +8,49 @@ const CACHE_PREFIX = 'coinbase:';
 const LAST_HEIGHT_KEY = 'coinbase:last_height';
 const LOCK_HEIGHT = 280000;
 
-// Initialize Redis client connection
+// Shared Redis client instance
+let redisClient = null;
+let redisInitPromise = null;
+
+// Initialize Redis client connection (singleton)
 async function initRedisClient() {
 	if (!config.redisUrl) {
 		debugLog("Redis not configured, coinbase cache disabled");
 		return null;
 	}
 
-	const { createClient } = require("redis");
-	const client = createClient({url: config.redisUrl});
-
-	if (!client.isOpen) {
-		await client.connect();
+	// Return existing client if already connected
+	if (redisClient && redisClient.isOpen) {
+		return redisClient;
 	}
 
-	return client;
+	// Wait for existing initialization if in progress
+	if (redisInitPromise) {
+		return redisInitPromise;
+	}
+
+	// Create new client
+	redisInitPromise = (async () => {
+		try {
+			const { createClient } = require("redis");
+			redisClient = createClient({url: config.redisUrl});
+
+			if (!redisClient.isOpen) {
+				await redisClient.connect();
+			}
+
+			debugLog("Redis client connected");
+			return redisClient;
+		} catch (err) {
+			console.error("Error connecting to Redis:", err);
+			redisClient = null;
+			throw err;
+		} finally {
+			redisInitPromise = null;
+		}
+	})();
+
+	return redisInitPromise;
 }
 
 // Load cache from JSON file into Redis (migration helper)
@@ -184,18 +212,20 @@ async function getCoinbaseOrigin(txid) {
 }
 
 async function getCacheStats() {
-	const redisClient = await initRedisClient();
-	if (!redisClient) {
+	const client = await initRedisClient();
+	if (!client) {
 		return { entries: 0, lastHeight: 0, loaded: false };
 	}
 
 	try {
-		// Count keys with our prefix (this might be slow with many keys)
-		const keys = await redisClient.keys(CACHE_PREFIX + '*');
-		const lastHeight = await redisClient.get(LAST_HEIGHT_KEY);
+		// Get last height (fast operation)
+		const lastHeight = await client.get(LAST_HEIGHT_KEY);
+
+		// Use DBSIZE for approximate count (much faster than KEYS)
+		const dbsize = await client.dbSize();
 
 		return {
-			entries: keys.length - 1,  // Subtract 1 for the last_height key
+			entries: dbsize > 0 ? dbsize - 1 : 0,  // Approximate, subtract 1 for last_height key
 			lastHeight: parseInt(lastHeight) || 0,
 			loaded: true
 		};
