@@ -56,7 +56,15 @@ block content
 				span #{new Decimal(getblockchaininfo.verificationprogress).times(100).toDP(3)}%
 
 
-		
+		- var miningEndBlock = 450000;
+		- var miningBlocksLeft = miningEndBlock - getblockchaininfo.blocks;
+		if (miningBlocksLeft > 0)
+			.text-center.py-2.mb-3(style="background: linear-gradient(90deg, #f7931a, #e8a940); border-radius: 6px;")
+				span.fw-bold.text-dark Phase I community mining ends at block #{miningEndBlock.toLocaleString()} — #{miningBlocksLeft.toLocaleString()} blocks remaining
+		else
+			.text-center.py-2.mb-3(style="background: linear-gradient(90deg, #dc3545, #c82333); border-radius: 6px;")
+				span.fw-bold.text-white Phase I community mining has stopped
+
 		include includes/index-network-summary.pug
 		
 		
