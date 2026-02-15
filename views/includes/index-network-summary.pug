@@ -35,14 +35,6 @@
 		//		//span (#{getnetworkinfo.connections_in.toLocaleString()} in #{getnetworkinfo.connections_out.toLocaleString()} out)
 		//		span #{peerSummary.getpeerinfo.length.toLocaleString()}
 
-		if (communityBalance)
-			+summaryItem("Community Balance", "Total balance in the community wallet")
-				+valueDisplaySpecial(communityBalance, 0)
-		else
-			+summaryItem("Community Balance", "Total balance in the community wallet")
-				span Not Available
-	
-			
 		+summaryItem("Difficulty", null, null, null, "icon:bi-clock-history", "./difficulty-history", "View difficulty history")
 			- var difficultyData = utils.formatLargeNumber(getblockchaininfo.difficulty, 3);
 			
@@ -99,7 +91,7 @@
 
 		+summaryItem("1000 Block TTM", "Average time to mine the last 1000 blocks.")
 			span #{averageBlockTimes.last1000 ? Math.round(averageBlockTimes.last1000) : 'N/A'} s
-	
+
 	hr.mt-3.mb-3
 
 	+summaryRow(1 + (getblockchaininfo.size_on_disk ? 1 : 0) + (utxoSetSummary || utxoSetSummaryPending ? 1 : 0))
